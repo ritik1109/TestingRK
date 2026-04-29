@@ -1,0 +1,1451 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0"/>
+<title>RK Consultancy – Home Appliance Services</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet"/>
+<style>
+  :root {
+    --bg: #0D0D0D;
+    --surface: #161616;
+    --card: #1E1E1E;
+    --border: #2A2A2A;
+    --accent: #FF6B35;
+    --accent2: #FFB800;
+    --text: #F0F0F0;
+    --muted: #888;
+    --success: #22C55E;
+    --error: #EF4444;
+    --warning: #F59E0B;
+    --info: #3B82F6;
+    --radius: 16px;
+    --radius-sm: 10px;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html,body { height:100%; background:var(--bg); color:var(--text); font-family:'DM Sans',sans-serif; overflow-x:hidden; }
+  
+  /* ── TYPOGRAPHY ── */
+  h1,h2,h3,h4 { font-family:'Syne',sans-serif; }
+  
+  /* ── PAGES ── */
+  .page { display:none; min-height:100vh; flex-direction:column; }
+  .page.active { display:flex; }
+  
+  /* ── TOPBAR ── */
+  .topbar {
+    display:flex; align-items:center; justify-content:space-between;
+    padding:16px 20px; background:var(--surface);
+    border-bottom:1px solid var(--border); position:sticky; top:0; z-index:100;
+  }
+  .topbar h1 { font-size:22px; font-weight:800; color:var(--accent); letter-spacing:-0.5px; }
+  .topbar .logo-dot { color:var(--accent2); }
+  .avatar-btn {
+    width:40px; height:40px; border-radius:50%; background:linear-gradient(135deg,var(--accent),var(--accent2));
+    border:none; cursor:pointer; display:flex; align-items:center; justify-content:center;
+    font-family:'Syne',sans-serif; font-weight:700; font-size:15px; color:#fff;
+  }
+  .admin-link-btn {
+    background:transparent; border:1px solid var(--border); color:var(--muted);
+    padding:6px 14px; border-radius:8px; font-size:12px; cursor:pointer;
+    font-family:'DM Sans',sans-serif;
+  }
+  
+  /* ── HERO ── */
+  .hero {
+    background:linear-gradient(160deg,#1a0a04,#0D0D0D 60%);
+    padding:32px 20px 20px; position:relative; overflow:hidden;
+  }
+  .hero::before {
+    content:''; position:absolute; top:-60px; right:-60px;
+    width:200px; height:200px; border-radius:50%;
+    background:radial-gradient(circle,rgba(255,107,53,.15),transparent 70%);
+  }
+  .hero p.sub { color:var(--muted); font-size:14px; margin-bottom:6px; }
+  .hero h2 { font-size:28px; font-weight:800; line-height:1.1; margin-bottom:16px; }
+  .hero h2 span { color:var(--accent); }
+  .hero-badge {
+    display:inline-flex; align-items:center; gap:6px;
+    background:rgba(255,107,53,.1); border:1px solid rgba(255,107,53,.3);
+    color:var(--accent); font-size:12px; padding:6px 12px; border-radius:20px;
+  }
+  
+  /* ── SEARCH ── */
+  .search-bar {
+    margin:16px 20px; background:var(--card); border:1px solid var(--border);
+    border-radius:var(--radius); display:flex; align-items:center; padding:0 16px;
+  }
+  .search-bar input {
+    flex:1; background:transparent; border:none; outline:none; color:var(--text);
+    font-family:'DM Sans',sans-serif; font-size:14px; padding:14px 0;
+  }
+  .search-bar span { color:var(--muted); font-size:18px; }
+  
+  /* ── SECTION LABEL ── */
+  .section-label {
+    padding:8px 20px 12px; font-family:'Syne',sans-serif;
+    font-size:18px; font-weight:700;
+  }
+  .section-label span { color:var(--accent); }
+  
+  /* ── APPLIANCE GRID ── */
+  .appliance-grid {
+    display:grid; grid-template-columns:repeat(3,1fr);
+    gap:12px; padding:0 20px 16px;
+  }
+  .appliance-card {
+    background:var(--card); border:1px solid var(--border);
+    border-radius:var(--radius); padding:18px 10px 14px;
+    display:flex; flex-direction:column; align-items:center; gap:8px;
+    cursor:pointer; transition:all .2s; position:relative; overflow:hidden;
+  }
+  .appliance-card::after {
+    content:''; position:absolute; inset:0;
+    background:linear-gradient(135deg,rgba(255,107,53,.08),transparent);
+    opacity:0; transition:.2s;
+  }
+  .appliance-card:active { transform:scale(.96); }
+  .appliance-card:active::after { opacity:1; }
+  .appliance-card .icon { font-size:36px; line-height:1; }
+  .appliance-card .name { font-size:11px; font-weight:600; text-align:center; color:var(--text); }
+  .appliance-card .tag {
+    font-size:9px; color:var(--accent); background:rgba(255,107,53,.1);
+    padding:2px 6px; border-radius:10px;
+  }
+  
+  /* ── WHY US ── */
+  .why-section { padding:8px 20px 24px; }
+  .why-grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+  .why-card {
+    background:var(--card); border:1px solid var(--border);
+    border-radius:var(--radius-sm); padding:14px;
+  }
+  .why-card .wi { font-size:22px; margin-bottom:6px; }
+  .why-card h4 { font-size:12px; font-weight:700; margin-bottom:2px; }
+  .why-card p { font-size:11px; color:var(--muted); }
+  
+  /* ── BOTTOM NAV ── */
+  .bottom-nav {
+    position:fixed; bottom:0; left:0; right:0;
+    background:var(--surface); border-top:1px solid var(--border);
+    display:flex; z-index:100;
+  }
+  .bottom-nav button {
+    flex:1; background:transparent; border:none; padding:12px 0 10px;
+    color:var(--muted); cursor:pointer; display:flex; flex-direction:column;
+    align-items:center; gap:3px; font-size:10px; font-family:'DM Sans',sans-serif;
+    transition:.15s;
+  }
+  .bottom-nav button.active { color:var(--accent); }
+  .bottom-nav button .ico { font-size:22px; }
+  
+  /* ── SPACER ── */
+  .spacer { height:80px; }
+  
+  /* ── LOGIN PAGE ── */
+  .login-wrap {
+    flex:1; display:flex; flex-direction:column; align-items:center;
+    justify-content:center; padding:32px 28px;
+  }
+  .login-icon { font-size:64px; margin-bottom:20px; }
+  .login-wrap h2 { font-size:26px; font-weight:800; text-align:center; margin-bottom:6px; }
+  .login-wrap p { color:var(--muted); font-size:14px; text-align:center; margin-bottom:32px; }
+  
+  /* ── FORM ELEMENTS ── */
+  .form-group { width:100%; margin-bottom:16px; }
+  .form-group label {
+    display:block; font-size:12px; color:var(--muted);
+    font-weight:600; margin-bottom:6px; text-transform:uppercase; letter-spacing:.5px;
+  }
+  .form-group input, .form-group select, .form-group textarea {
+    width:100%; background:var(--card); border:1.5px solid var(--border);
+    border-radius:var(--radius-sm); color:var(--text);
+    font-family:'DM Sans',sans-serif; font-size:15px; padding:14px 16px;
+    outline:none; transition:.2s;
+  }
+  .form-group input:focus, .form-group select:focus, .form-group textarea:focus {
+    border-color:var(--accent);
+  }
+  .form-group select { appearance:none; }
+  .form-group textarea { height:90px; resize:none; }
+  
+  /* ── PHONE INPUT ── */
+  .phone-wrap { display:flex; gap:10px; }
+  .country-code {
+    background:var(--card); border:1.5px solid var(--border);
+    border-radius:var(--radius-sm); padding:14px 12px; color:var(--text); font-size:15px;
+    white-space:nowrap;
+  }
+  
+  /* ── BUTTONS ── */
+  .btn {
+    width:100%; padding:16px; border:none; border-radius:var(--radius);
+    font-family:'Syne',sans-serif; font-weight:700; font-size:16px;
+    cursor:pointer; transition:.2s; letter-spacing:.3px;
+  }
+  .btn-primary {
+    background:linear-gradient(135deg,var(--accent),#ff8c5a);
+    color:#fff; box-shadow:0 4px 20px rgba(255,107,53,.3);
+  }
+  .btn-primary:active { transform:scale(.98); }
+  .btn-outline {
+    background:transparent; border:1.5px solid var(--border);
+    color:var(--text);
+  }
+  .btn-sm {
+    width:auto; padding:8px 18px; font-size:13px; border-radius:8px;
+  }
+  .btn-danger { background:#3a1010; color:var(--error); border:1px solid var(--error); }
+  .btn-success { background:#0a2e18; color:var(--success); border:1px solid var(--success); }
+  
+  /* ── OTP BOXES ── */
+  .otp-row { display:flex; gap:10px; justify-content:center; margin-bottom:8px; }
+  .otp-box {
+    width:48px; height:56px; background:var(--card);
+    border:1.5px solid var(--border); border-radius:var(--radius-sm);
+    color:var(--text); font-size:22px; font-weight:700;
+    text-align:center; outline:none; font-family:'Syne',sans-serif;
+  }
+  .otp-box:focus { border-color:var(--accent); }
+  
+  /* ── BACK BTN ── */
+  .back-btn {
+    background:transparent; border:none; color:var(--muted);
+    cursor:pointer; font-size:24px; padding:4px 8px;
+  }
+  
+  /* ── SERVICE PAGE ── */
+  .service-header {
+    padding:20px; display:flex; align-items:center; gap:14px;
+    border-bottom:1px solid var(--border);
+  }
+  .service-header .aplc-icon { font-size:44px; }
+  .service-header h2 { font-size:22px; font-weight:800; }
+  .service-header p { color:var(--muted); font-size:13px; }
+  .service-options { display:flex; flex-direction:column; gap:12px; padding:20px; }
+  .service-option {
+    background:var(--card); border:1.5px solid var(--border);
+    border-radius:var(--radius); padding:18px; cursor:pointer;
+    display:flex; align-items:center; justify-content:space-between;
+    transition:.2s;
+  }
+  .service-option.selected { border-color:var(--accent); background:rgba(255,107,53,.05); }
+  .service-option:active { transform:scale(.98); }
+  .service-option h4 { font-size:15px; font-weight:700; }
+  .service-option p { font-size:12px; color:var(--muted); margin-top:2px; }
+  .service-option .price { color:var(--accent); font-weight:700; font-size:13px; }
+  .check-circle { width:24px; height:24px; border-radius:50%; border:2px solid var(--border); }
+  .check-circle.on { background:var(--accent); border-color:var(--accent); display:flex; align-items:center; justify-content:center; }
+  
+  /* ── BOOKINGS LIST ── */
+  .booking-card {
+    background:var(--card); border:1px solid var(--border);
+    border-radius:var(--radius); padding:16px; margin-bottom:12px;
+  }
+  .booking-card .bc-header { display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:10px; }
+  .booking-card h4 { font-size:15px; font-weight:700; }
+  .booking-card .bc-meta { font-size:12px; color:var(--muted); margin-top:2px; }
+  .badge {
+    font-size:11px; padding:4px 10px; border-radius:20px; font-weight:600;
+  }
+  .badge-pending { background:rgba(245,158,11,.15); color:var(--warning); }
+  .badge-confirmed { background:rgba(34,197,94,.15); color:var(--success); }
+  .badge-rejected { background:rgba(239,68,68,.15); color:var(--error); }
+  .badge-completed { background:rgba(59,130,246,.15); color:var(--info); }
+  .bc-row { display:flex; gap:8px; flex-wrap:wrap; margin-top:8px; }
+  .bc-tag {
+    font-size:11px; color:var(--muted); background:var(--surface);
+    padding:4px 10px; border-radius:8px;
+  }
+  
+  /* ── PROFILE ── */
+  .profile-hero {
+    background:linear-gradient(160deg,#1a0a04,var(--surface));
+    padding:32px 20px 24px; text-align:center;
+  }
+  .profile-avatar {
+    width:80px; height:80px; border-radius:50%;
+    background:linear-gradient(135deg,var(--accent),var(--accent2));
+    margin:0 auto 12px; display:flex; align-items:center; justify-content:center;
+    font-size:32px; font-weight:800; font-family:'Syne',sans-serif;
+  }
+  .profile-hero h2 { font-size:22px; font-weight:800; }
+  .profile-hero p { color:var(--muted); font-size:14px; }
+  .profile-stats {
+    display:grid; grid-template-columns:repeat(3,1fr);
+    gap:1px; background:var(--border); margin:20px;
+    border-radius:var(--radius); overflow:hidden;
+  }
+  .stat-box { background:var(--card); padding:14px; text-align:center; }
+  .stat-box .num { font-size:22px; font-weight:800; font-family:'Syne',sans-serif; color:var(--accent); }
+  .stat-box .lbl { font-size:10px; color:var(--muted); }
+  .info-row {
+    display:flex; align-items:center; gap:12px; padding:14px 20px;
+    border-bottom:1px solid var(--border);
+  }
+  .info-row .ir-icon { font-size:20px; }
+  .info-row .ir-text { flex:1; }
+  .info-row .ir-label { font-size:11px; color:var(--muted); }
+  .info-row .ir-val { font-size:14px; font-weight:500; }
+  
+  /* ── ADMIN ── */
+  .admin-header {
+    background:linear-gradient(135deg,#0a0a1a,#0D0D0D);
+    padding:28px 20px 20px; border-bottom:1px solid #1a1a2e;
+  }
+  .admin-header h1 { font-size:24px; font-weight:800; color:#818cf8; }
+  .admin-header p { color:var(--muted); font-size:13px; }
+  .stats-row { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; padding:16px 20px; }
+  .stat-card {
+    background:var(--card); border:1px solid var(--border);
+    border-radius:var(--radius-sm); padding:14px; text-align:center;
+  }
+  .stat-card .s-num { font-size:24px; font-weight:800; font-family:'Syne',sans-serif; }
+  .stat-card .s-lbl { font-size:10px; color:var(--muted); margin-top:2px; }
+  .stat-card.orange .s-num { color:var(--accent); }
+  .stat-card.green .s-num { color:var(--success); }
+  .stat-card.yellow .s-num { color:var(--warning); }
+  .tab-row { display:flex; gap:8px; padding:0 20px 16px; overflow-x:auto; }
+  .tab-btn {
+    flex-shrink:0; padding:8px 18px; border-radius:20px; border:1.5px solid var(--border);
+    background:transparent; color:var(--muted); cursor:pointer; font-size:13px;
+    font-family:'DM Sans',sans-serif; transition:.2s;
+  }
+  .tab-btn.active { background:var(--accent); border-color:var(--accent); color:#fff; font-weight:600; }
+  .admin-booking-card {
+    background:var(--card); border:1px solid var(--border);
+    border-radius:var(--radius); padding:16px; margin-bottom:12px;
+  }
+  .admin-booking-card .ab-top { display:flex; justify-content:space-between; margin-bottom:10px; }
+  .admin-booking-card h4 { font-size:14px; font-weight:700; }
+  .admin-booking-card .ab-info { font-size:12px; color:var(--muted); margin-bottom:6px; }
+  .action-row { display:flex; gap:8px; margin-top:12px; }
+  
+  /* ── MODAL / OVERLAY ── */
+  .overlay {
+    display:none; position:fixed; inset:0;
+    background:rgba(0,0,0,.7); z-index:200; align-items:flex-end;
+  }
+  .overlay.open { display:flex; }
+  .sheet {
+    background:var(--surface); border-radius:24px 24px 0 0;
+    padding:24px 24px 40px; width:100%; max-height:90vh; overflow-y:auto;
+  }
+  .sheet-handle {
+    width:40px; height:4px; background:var(--border); border-radius:2px;
+    margin:0 auto 20px;
+  }
+  
+  /* ── TOAST ── */
+  #toast {
+    position:fixed; top:20px; left:50%; transform:translateX(-50%) translateY(-80px);
+    background:var(--card); border:1px solid var(--border); border-radius:12px;
+    padding:12px 20px; font-size:14px; z-index:999; transition:.3s;
+    white-space:nowrap; max-width:320px; text-align:center;
+  }
+  #toast.show { transform:translateX(-50%) translateY(0); }
+  #toast.success { border-color:var(--success); color:var(--success); }
+  #toast.error { border-color:var(--error); color:var(--error); }
+  
+  /* ── EMPTY STATE ── */
+  .empty-state { text-align:center; padding:48px 20px; }
+  .empty-state .ei { font-size:56px; margin-bottom:12px; }
+  .empty-state h3 { font-size:18px; font-weight:700; margin-bottom:6px; }
+  .empty-state p { color:var(--muted); font-size:14px; }
+  
+  /* ── LOADING ── */
+  .spinner {
+    width:32px; height:32px; border:3px solid var(--border);
+    border-top:3px solid var(--accent); border-radius:50%;
+    animation:spin .8s linear infinite; margin:32px auto;
+  }
+  @keyframes spin { to { transform:rotate(360deg); } }
+  
+  /* ── SCROLLBAR ── */
+  ::-webkit-scrollbar { width:4px; height:4px; }
+  ::-webkit-scrollbar-track { background:transparent; }
+  ::-webkit-scrollbar-thumb { background:var(--border); border-radius:2px; }
+  
+  /* ── UTILS ── */
+  .pad { padding:20px; }
+  .mt8 { margin-top:8px; }
+  .mt16 { margin-top:16px; }
+  .mt24 { margin-top:24px; }
+  .text-center { text-align:center; }
+  .text-muted { color:var(--muted); font-size:13px; }
+  .divider { height:1px; background:var(--border); margin:16px 0; }
+  .flex-center { display:flex; align-items:center; justify-content:center; }
+  .gap8 { gap:8px; }
+  
+  /* ── STEP INDICATOR ── */
+  .steps { display:flex; align-items:center; gap:0; padding:0 20px 20px; }
+  .step-dot {
+    width:28px; height:28px; border-radius:50%; border:2px solid var(--border);
+    display:flex; align-items:center; justify-content:center;
+    font-size:12px; font-weight:700; color:var(--muted); flex-shrink:0;
+  }
+  .step-dot.done { background:var(--accent); border-color:var(--accent); color:#fff; }
+  .step-dot.active { border-color:var(--accent); color:var(--accent); }
+  .step-line { flex:1; height:2px; background:var(--border); }
+  .step-line.done { background:var(--accent); }
+
+  .logout-btn {
+    margin:16px 20px; display:block; width:calc(100% - 40px);
+    padding:14px; background:transparent; border:1.5px solid var(--border);
+    border-radius:var(--radius); color:var(--error); font-size:14px;
+    font-family:'DM Sans',sans-serif; cursor:pointer;
+  }
+</style>
+</head>
+<body>
+
+<div id="toast"></div>
+
+<!-- ═══════════════════════════ HOME PAGE ═══════════════════════════ -->
+<div id="page-home" class="page active">
+  <div class="topbar">
+    <h1>
+      <svg width="130" height="36" viewBox="0 0 140 40" xmlns="http://www.w3.org/2000/svg" style="display:block;">
+  <defs>
+    <clipPath id="logoclip">
+      <rect x="0" y="0" width="100" height="40" rx="7" ry="7"/>
+    </clipPath>
+  </defs>
+  <g clip-path="url(#logoclip)">
+    <rect x="0" y="0" width="100" height="40" rx="7" ry="7" fill="#111"/>
+    <polygon points="0,0 58,0 44,40 0,40" fill="#FF6B35"/>
+  </g>
+  <text x="24" y="28" text-anchor="middle" font-family="'Raleway',sans-serif" font-size="20" font-weight="600" fill="#fff">R</text>
+  <text x="72" y="28" text-anchor="middle" font-family="'Raleway',sans-serif" font-size="20" font-weight="600" fill="#FF6B35">K</text>
+  <text x="106" y="26" font-family="'Raleway',sans-serif" font-size="9" font-weight="400" fill="#FF6B35" letter-spacing="1">CO.</text>
+</svg>
+    </h1>
+    <div style="display:flex;gap:10px;align-items:center;">
+      <button class="admin-link-btn" onclick="goAdmin()">Admin</button>
+      <button class="avatar-btn" id="topbar-avatar" onclick="goProfile()" style="display:none"></button>
+      <button class="btn btn-sm btn-primary" id="topbar-login" onclick="showLoginFor(null)" style="display:none;width:auto;padding:8px 16px;font-size:13px;">Login</button>
+    </div>
+  </div>
+
+  <div style="flex:1; overflow-y:auto;">
+    <div class="hero">
+      <p class="sub">🏠 RK Consultancy</p>
+      <h2>Expert <span>Repair &</span><br>Installation</h2>
+      <div class="hero-badge">⚡ Same-day service available</div>
+    </div>
+
+    <div class="search-bar">
+      <span>🔍</span>
+      <input id="search-input" type="text" placeholder="Search appliance..." oninput="filterAppliances()"/>
+    </div>
+
+    <div id="guest-banner" style="display:none; margin:0 20px 4px; background:rgba(255,107,53,.08); border:1px solid rgba(255,107,53,.3); border-radius:12px; padding:12px 16px; align-items:center; justify-content:space-between; gap:10px;">
+      <p style="font-size:13px; color:var(--text); margin:0;">👋 <b>New here?</b> Create an account to book a service.</p>
+      <button class="btn btn-primary btn-sm" style="white-space:nowrap;" onclick="showLoginFor(null)">Login / Register</button>
+    </div>
+
+    <div class="section-label">Our <span>Services</span></div>
+    <div class="appliance-grid" id="appliance-grid"></div>
+
+    <div class="why-section">
+      <div class="section-label" style="padding:0 0 12px;">Why <span>RK Consultancy?</span></div>
+      <div class="why-grid">
+        <div class="why-card"><div class="wi">⚡</div><h4>Fast Response</h4><p>Same-day slots available</p></div>
+        <div class="why-card"><div class="wi">🛡️</div><h4>Guaranteed</h4><p>30-day service warranty</p></div>
+        <div class="why-card"><div class="wi">💰</div><h4>Transparent</h4><p>No hidden charges</p></div>
+        <div class="why-card"><div class="wi">⭐</div><h4>5-Star Rated</h4><p>2000+ happy customers</p></div>
+      </div>
+    </div>
+    <div class="spacer"></div>
+  </div>
+
+  <div class="bottom-nav">
+    <button class="active" onclick="switchTab('home')"><span class="ico">🏠</span>Home</button>
+    <button onclick="switchTab('bookings')"><span class="ico">📋</span>Bookings</button>
+    <button onclick="switchTab('profile')"><span class="ico">👤</span>Profile</button>
+  </div>
+</div>
+
+<!-- ═══════════════════════════ LOGIN PAGE ═══════════════════════════ -->
+<div id="page-login" class="page">
+  <div class="topbar">
+    <button class="back-btn" onclick="goBack()">←</button>
+    <h1 style="font-size:18px;">Login / Register</h1>
+    <div style="width:40px;"></div>
+  </div>
+  <div class="login-wrap" id="login-phone-step">
+    <div class="login-icon">📱</div>
+    <h2>Enter Your<br/>Phone Number</h2>
+    <p>We'll send you a 6-digit OTP to verify your number</p>
+    <div class="form-group" style="width:100%">
+      <label>Mobile Number</label>
+      <div class="phone-wrap">
+        <div class="country-code">🇮🇳 +91</div>
+        <input id="phone-input" type="tel" maxlength="10" placeholder="9876543210" style="flex:1;min-width:0;"/>
+      </div>
+    </div>
+    <button class="btn btn-primary" onclick="sendOTP()">Send OTP</button>
+    <p class="text-muted mt16">By continuing, you agree to our Terms of Service</p>
+  </div>
+
+  <div class="login-wrap" id="login-otp-step" style="display:none;">
+    <div class="login-icon">🔐</div>
+    <h2>Verify OTP</h2>
+    <p id="otp-desc">Enter the 6-digit code sent to your number</p>
+    <div class="otp-row" onpaste="otpPaste(event)">
+      <input class="otp-box" id="otp0" maxlength="1" type="tel" oninput="otpInput(event,0)" onkeydown="otpKeydown(event,0)"/>
+      <input class="otp-box" id="otp1" maxlength="1" type="tel" oninput="otpInput(event,1)" onkeydown="otpKeydown(event,1)"/>
+      <input class="otp-box" id="otp2" maxlength="1" type="tel" oninput="otpInput(event,2)" onkeydown="otpKeydown(event,2)"/>
+      <input class="otp-box" id="otp3" maxlength="1" type="tel" oninput="otpInput(event,3)" onkeydown="otpKeydown(event,3)"/>
+      <input class="otp-box" id="otp4" maxlength="1" type="tel" oninput="otpInput(event,4)" onkeydown="otpKeydown(event,4)"/>
+      <input class="otp-box" id="otp5" maxlength="1" type="tel" oninput="otpInput(event,5)" onkeydown="otpKeydown(event,5)"/>
+    </div>
+    <button class="btn btn-primary mt16" onclick="verifyOTP()">Verify OTP</button>
+    <p class="text-muted mt16">Didn't receive? <span style="color:var(--accent);cursor:pointer;" onclick="sendOTP()">Resend OTP</span></p>
+  </div>
+
+  <div class="login-wrap" id="login-profile-step" style="display:none;">
+    <div class="login-icon">👋</div>
+    <h2>Complete Your<br/>Profile</h2>
+    <p>Tell us a bit about yourself</p>
+    <div class="form-group" style="width:100%">
+      <label>Full Name</label>
+      <input id="reg-name" type="text" placeholder="Rahul Sharma"/>
+    </div>
+    <div class="form-group" style="width:100%">
+      <label>Location / City</label>
+      <input id="reg-location" type="text" placeholder="Indore, Madhya Pradesh"/>
+    </div>
+    <div class="form-group" style="width:100%">
+      <label>Full Address</label>
+      <input id="reg-address" type="text" placeholder="123 Main Street, Sector 5"/>
+    </div>
+    <div class="form-group" style="width:100%">
+      <label>PIN Code</label>
+      <input id="reg-pin" type="tel" maxlength="6" placeholder="452001"/>
+    </div>
+    <button class="btn btn-primary" onclick="submitProfile()">Complete Registration</button>
+  </div>
+</div>
+
+<!-- ═══════════════════════════ SERVICE BOOKING PAGE ═══════════════════════════ -->
+<div id="page-service" class="page">
+  <div class="topbar">
+    <button class="back-btn" onclick="goBack()">←</button>
+    <h1 style="font-size:18px;" id="service-page-title">Book Service</h1>
+    <div style="width:40px;"></div>
+  </div>
+
+  <div style="flex:1;overflow-y:auto;">
+    <div class="service-header">
+      <div class="aplc-icon" id="service-appliance-icon">❄️</div>
+      <div>
+        <h2 id="service-appliance-name">AC</h2>
+        <p>Select a service type below</p>
+      </div>
+    </div>
+
+    <!-- Steps -->
+    <div class="steps" style="margin-top:16px;">
+      <div class="step-dot active" id="s1">1</div>
+      <div class="step-line" id="sl1"></div>
+      <div class="step-dot" id="s2">2</div>
+      <div class="step-line" id="sl2"></div>
+      <div class="step-dot" id="s3">3</div>
+    </div>
+
+    <!-- Step 1: Choose service -->
+    <div id="step-service">
+      <div class="section-label">Choose Service</div>
+      <div class="service-options" id="service-options-list"></div>
+      <div class="pad">
+        <button class="btn btn-primary" onclick="nextStep(2)">Continue →</button>
+      </div>
+    </div>
+
+    <!-- Step 2: Date & Time -->
+    <div id="step-datetime" style="display:none;">
+      <div class="section-label">Pick Date & Time</div>
+      <div class="pad">
+        <div class="form-group">
+          <label>Preferred Date</label>
+          <input id="booking-date" type="date"/>
+        </div>
+        <div class="form-group">
+          <label>Preferred Time Slot</label>
+          <select id="booking-time">
+            <option value="9AM-11AM">9:00 AM – 11:00 AM</option>
+            <option value="11AM-1PM">11:00 AM – 1:00 PM</option>
+            <option value="1PM-3PM">1:00 PM – 3:00 PM</option>
+            <option value="3PM-5PM">3:00 PM – 5:00 PM</option>
+            <option value="5PM-7PM">5:00 PM – 7:00 PM</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Additional Notes (optional)</label>
+          <textarea id="booking-desc" placeholder="Describe the issue..."></textarea>
+        </div>
+        <div style="display:flex;gap:10px;">
+          <button class="btn btn-outline" style="flex:1;" onclick="nextStep(1)">← Back</button>
+          <button class="btn btn-primary" style="flex:1;" onclick="nextStep(3)">Continue →</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Step 3: Confirm -->
+    <div id="step-confirm" style="display:none;">
+      <div class="section-label">Confirm Booking</div>
+      <div class="pad">
+        <div class="booking-card" id="confirm-summary"></div>
+        <div class="mt16">
+          <div style="background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.3);border-radius:10px;padding:14px;margin-bottom:16px;">
+            <p style="font-size:13px;color:var(--warning);">⚠️ Booking will be confirmed only after admin approval. You'll see the status in My Bookings.</p>
+          </div>
+          <div style="display:flex;gap:10px;">
+            <button class="btn btn-outline" style="flex:1;" onclick="nextStep(2)">← Back</button>
+            <button class="btn btn-primary" style="flex:1;" onclick="submitBooking()">Confirm Booking</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="spacer"></div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════ MY BOOKINGS PAGE ═══════════════════════════ -->
+<div id="page-bookings" class="page">
+  <div class="topbar">
+    <h1>My Bookings</h1>
+    <button class="btn btn-sm btn-primary" style="width:auto;padding:8px 16px;font-size:13px;" onclick="switchTab('home')">+ New</button>
+  </div>
+  <div style="flex:1;overflow-y:auto;padding:16px 20px 0;">
+    <div id="bookings-list"></div>
+    <div class="spacer"></div>
+  </div>
+  <div class="bottom-nav">
+    <button onclick="switchTab('home')"><span class="ico">🏠</span>Home</button>
+    <button class="active"><span class="ico">📋</span>Bookings</button>
+    <button onclick="switchTab('profile')"><span class="ico">👤</span>Profile</button>
+  </div>
+</div>
+
+<!-- ═══════════════════════════ PROFILE PAGE ═══════════════════════════ -->
+<div id="page-profile" class="page">
+  <div class="topbar">
+    <h1>My Profile</h1>
+    <div style="width:40px;"></div>
+  </div>
+  <div style="flex:1;overflow-y:auto;">
+    <div id="profile-content"></div>
+    <div class="spacer"></div>
+  </div>
+  <div class="bottom-nav">
+    <button onclick="switchTab('home')"><span class="ico">🏠</span>Home</button>
+    <button onclick="switchTab('bookings')"><span class="ico">📋</span>Bookings</button>
+    <button class="active"><span class="ico">👤</span>Profile</button>
+  </div>
+</div>
+
+<!-- ═══════════════════════════ ADMIN LOGIN PAGE ═══════════════════════════ -->
+<div id="page-admin-login" class="page">
+  <div class="topbar">
+    <button class="back-btn" onclick="showPage('home')">←</button>
+    <h1 style="font-size:18px;color:#818cf8;">Admin Portal</h1>
+    <div style="width:40px;"></div>
+  </div>
+  <div class="login-wrap">
+    <div class="login-icon">🔒</div>
+    <h2>Admin Login</h2>
+    <p>Access restricted to authorized personnel only</p>
+    <div class="form-group" style="width:100%">
+      <label>Username</label>
+      <input id="admin-username" type="text" placeholder="admin"/>
+    </div>
+    <div class="form-group" style="width:100%">
+      <label>Password</label>
+      <input id="admin-password" type="password" placeholder="••••••••"/>
+    </div>
+    <button class="btn btn-primary" style="background:linear-gradient(135deg,#4f46e5,#818cf8);" onclick="adminLogin()">Login to Admin</button>
+    <p class="text-muted mt16" style="font-size:11px;">Default: admin / Admin@1234</p>
+  </div>
+</div>
+
+<!-- ═══════════════════════════ ADMIN DASHBOARD ═══════════════════════════ -->
+<div id="page-admin" class="page">
+  <div class="admin-header">
+    <div style="display:flex;justify-content:space-between;align-items:center;">
+      <div>
+        <h1>⚙️ RK Consultancy – Admin</h1>
+        <p>Manage all bookings & users</p>
+      </div>
+      <button onclick="adminLogout()" style="background:transparent;border:1px solid #333;color:var(--muted);padding:8px 14px;border-radius:8px;font-size:12px;cursor:pointer;">Logout</button>
+    </div>
+  </div>
+
+  <div style="flex:1;overflow-y:auto;">
+    <div class="stats-row" id="admin-stats-row">
+      <div class="stat-card orange"><div class="s-num" id="st-total">0</div><div class="s-lbl">Total</div></div>
+      <div class="stat-card yellow"><div class="s-num" id="st-pending">0</div><div class="s-lbl">Pending</div></div>
+      <div class="stat-card green"><div class="s-num" id="st-confirmed">0</div><div class="s-lbl">Confirmed</div></div>
+    </div>
+
+    <div class="tab-row">
+      <button class="tab-btn active" onclick="adminTab('all')">All Bookings</button>
+      <button class="tab-btn" onclick="adminTab('pending')">Pending</button>
+      <button class="tab-btn" onclick="adminTab('confirmed')">Confirmed</button>
+      <button class="tab-btn" onclick="adminTab('users')">Users</button>
+    </div>
+
+    <div id="admin-content" style="padding:0 20px 20px;"></div>
+    <div class="spacer"></div>
+  </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════════════════
+//  CONFIG
+// ═══════════════════════════════════════════════════════════════════
+////const API = 'http://localhost:3001/api';
+
+const API = 'http://localhost:3001/api';
+
+// ─── CHECK BACKEND CONNECTION ───────────────────────────────────────
+async function checkBackend() {
+  try {
+    const r = await fetch(`${API}/health`, { signal: AbortSignal.timeout(3000) });
+  } catch(e) {
+    document.body.insertAdjacentHTML('afterbegin', `
+      <div id="backend-warning" style="
+        position:fixed;top:0;left:0;right:0;z-index:9999;
+        background:#3a1010;border-bottom:2px solid #EF4444;
+        padding:12px 16px;text-align:center;font-size:13px;color:#fca5a5;
+        font-family:'DM Sans',sans-serif;
+      ">
+        ⚠️ Backend not running! Open terminal → go to <b style="color:#fff;">backend/</b> folder → run <b style="color:#fff;">node server.js</b>
+        <button onclick="document.getElementById('backend-warning').remove();checkBackend();" 
+          style="margin-left:12px;background:#EF4444;border:none;color:#fff;padding:4px 10px;border-radius:6px;cursor:pointer;font-size:12px;">
+          Retry
+        </button>
+      </div>
+    `);
+  }
+}
+
+
+// ═══════════════════════════════════════════════════════════════════
+//  STATE
+// ═══════════════════════════════════════════════════════════════════
+const state = {
+  token: localStorage.getItem('token') || null,
+  user: null,
+  adminToken: localStorage.getItem('adminToken') || null,
+  currentPage: 'home',
+  prevPage: 'home',
+  selectedAppliance: null,
+  selectedService: null,
+  afterLogin: null,       // page to go after login
+  bookingAppliance: null  // appliance to book after login
+};
+
+// ═══════════════════════════════════════════════════════════════════
+//  APPLIANCES DATA
+// ═══════════════════════════════════════════════════════════════════
+const appliances = [
+  { id:'ac',        icon:'❄️',  name:'AC',        tag:'Popular' },
+  { id:'cooler',    icon:'💨',  name:'Cooler',     tag:'' },
+  { id:'fridge',    icon:'🧊',  name:'Fridge',     tag:'Popular' },
+  { id:'chimney',   icon:'🌀',  name:'Chimney',    tag:'' },
+  { id:'induction', icon:'🔥',  name:'Induction',  tag:'' },
+  { id:'washing',   icon:'🫧',  name:'Washing M.', tag:'' },
+  { id:'geyser',    icon:'🚿',  name:'Geyser',     tag:'' },
+  { id:'tv',        icon:'📺',  name:'TV/LED',     tag:'' },
+  { id:'microwave', icon:'📡',  name:'Microwave',  tag:'' },
+  { id:'fan',       icon:'🌬️', name:'Fan',         tag:'' },
+  { id:'ro',        icon:'💧',  name:'RO Water',   tag:'New' },
+  { id:'other',     icon:'🔧',  name:'Other',      tag:'' },
+];
+
+const services = {
+  ac:        ['Repair','Installation','Service/Clean','Gas Refill'],
+  cooler:    ['Repair','Service/Clean','Motor Replace','Pad Replace'],
+  fridge:    ['Repair','Gas Refill','Compressor Check','General Service'],
+  chimney:   ['Repair','Installation','Service/Clean','Motor Replace'],
+  induction: ['Repair','Coil Replace','General Service'],
+  washing:   ['Repair','Installation','Service/Clean','Motor Replace'],
+  geyser:    ['Repair','Installation','Element Replace','General Service'],
+  tv:        ['Repair','Screen Replace','Installation','General Service'],
+  microwave: ['Repair','General Service','Magnetron Replace'],
+  fan:       ['Repair','Installation','Winding Replace'],
+  ro:        ['Service/Clean','Filter Replace','Repair','Installation'],
+  other:     ['Repair','Installation','General Service','Inspection'],
+};
+
+// ═══════════════════════════════════════════════════════════════════
+//  INIT
+// ═══════════════════════════════════════════════════════════════════
+function init() {
+  renderAppliances(appliances);
+  updateTopbar();
+  // Set min booking date to today
+  const d = document.getElementById('booking-date');
+  if(d) d.min = new Date().toISOString().split('T')[0];
+}
+
+// ═══════════════════════════════════════════════════════════════════
+//  RENDER APPLIANCES
+// ═══════════════════════════════════════════════════════════════════
+function renderAppliances(list) {
+  const grid = document.getElementById('appliance-grid');
+  grid.innerHTML = list.map(a => `
+    <div class="appliance-card" onclick="selectAppliance('${a.id}')">
+      <div class="icon">${a.icon}</div>
+      <div class="name">${a.name}</div>
+      ${a.tag ? `<div class="tag">${a.tag}</div>` : '<div style="height:16px;"></div>'}
+    </div>
+  `).join('');
+}
+
+function filterAppliances() {
+  const q = document.getElementById('search-input').value.toLowerCase();
+  renderAppliances(appliances.filter(a => a.name.toLowerCase().includes(q)));
+}
+
+// ═══════════════════════════════════════════════════════════════════
+//  APPLIANCE CLICK
+// ═══════════════════════════════════════════════════════════════════
+function selectAppliance(id) {
+  state.selectedAppliance = id;
+  if (!state.token) {
+    state.bookingAppliance = id;
+    state.afterLogin = 'service';
+    showPage('login');
+    return;
+  }
+  openServicePage(id);
+}
+
+function openServicePage(id) {
+  const a = appliances.find(x => x.id === id);
+  state.selectedAppliance = id;
+  state.selectedService = null;
+  document.getElementById('service-appliance-icon').textContent = a.icon;
+  document.getElementById('service-appliance-name').textContent = a.name;
+  document.getElementById('service-page-title').textContent = a.name + ' Service';
+
+  // Render service options
+  const opts = services[id] || ['Repair','General Service'];
+  document.getElementById('service-options-list').innerHTML = opts.map((s,i) => `
+    <div class="service-option" id="sopt-${i}" onclick="selectService('${s}',${i})">
+      <div>
+        <h4>${s}</h4>
+        <p>${serviceDesc(s)}</p>
+      </div>
+      <div>
+        <div class="price">${servicePrice(s)}</div>
+        <div class="check-circle" id="scheck-${i}"></div>
+      </div>
+    </div>
+  `).join('');
+
+  nextStep(1);
+  showPage('service');
+}
+
+function serviceDesc(s) {
+  const map = {
+    'Repair':'Fix existing issues & faults',
+    'Installation':'Fresh installation & setup',
+    'Service/Clean':'Deep cleaning & maintenance',
+    'Gas Refill':'Refrigerant/gas top-up',
+    'General Service':'Routine check & servicing',
+    'Motor Replace':'Motor unit replacement',
+    'Compressor Check':'Compressor diagnostic & fix',
+    'Screen Replace':'Display screen replacement',
+    'Filter Replace':'Filter cartridge replacement',
+    'Pad Replace':'Cooling pad replacement',
+    'Inspection':'Diagnostic & inspection report',
+    'Winding Replace':'Winding replacement',
+    'Element Replace':'Heating element replacement',
+    'Magnetron Replace':'Magnetron replacement',
+    'Coil Replace':'Coil replacement',
+  };
+  return map[s] || 'Professional service';
+}
+
+function servicePrice(s) {
+  const map = {
+    'Repair':'₹299+','Installation':'₹499+','Service/Clean':'₹399+',
+    'Gas Refill':'₹799+','General Service':'₹349+','Motor Replace':'₹599+',
+    'Compressor Check':'₹499+','Screen Replace':'₹999+','Filter Replace':'₹299+',
+    'Pad Replace':'₹249+','Inspection':'₹199+','Winding Replace':'₹549+',
+    'Element Replace':'₹449+','Magnetron Replace':'₹899+','Coil Replace':'₹549+',
+  };
+  return map[s] || '₹299+';
+}
+
+function selectService(name, idx) {
+  state.selectedService = name;
+  document.querySelectorAll('.service-option').forEach((el,i) => {
+    el.classList.toggle('selected', i===idx);
+    const ch = document.getElementById('scheck-'+i);
+    if(i===idx){ ch.classList.add('on'); ch.innerHTML='✓'; }
+    else { ch.classList.remove('on'); ch.innerHTML=''; }
+  });
+}
+
+function nextStep(n) {
+  document.getElementById('step-service').style.display   = n===1?'':'none';
+  document.getElementById('step-datetime').style.display  = n===2?'':'none';
+  document.getElementById('step-confirm').style.display   = n===3?'':'none';
+
+  // Step dots
+  for(let i=1;i<=3;i++){
+    const d=document.getElementById('s'+i);
+    d.className = 'step-dot'+(i<n?' done':i===n?' active':'');
+  }
+  for(let i=1;i<=2;i++){
+    const l=document.getElementById('sl'+i);
+    l.className = 'step-line'+(i<n?' done':'');
+  }
+
+  if(n===2 && !state.selectedService) { toast('Please select a service type','error'); nextStep(1); return; }
+  if(n===3) buildConfirmSummary();
+}
+
+function buildConfirmSummary() {
+  const a = appliances.find(x => x.id === state.selectedAppliance);
+  const date = document.getElementById('booking-date').value;
+  const time = document.getElementById('booking-time').value;
+  const desc = document.getElementById('booking-desc').value;
+  if(!date){ toast('Please select a date','error'); nextStep(2); return; }
+  document.getElementById('confirm-summary').innerHTML = `
+    <div class="bc-header">
+      <div><h4>${a.icon} ${a.name} – ${state.selectedService}</h4><div class="bc-meta">${state.user?.name || ''}</div></div>
+      <div class="badge badge-pending">Pending</div>
+    </div>
+    <div class="bc-row">
+      <div class="bc-tag">📅 ${date}</div>
+      <div class="bc-tag">🕐 ${time}</div>
+    </div>
+    <div class="bc-row">
+      <div class="bc-tag">📍 ${state.user?.location||'—'}</div>
+      <div class="bc-tag">📌 ${state.user?.pinAddress||'—'}</div>
+    </div>
+    ${desc?`<p style="font-size:12px;color:var(--muted);margin-top:8px;">📝 ${desc}</p>`:''}
+  `;
+}
+
+// ═══════════════════════════════════════════════════════════════════
+//  BOOKING SUBMIT
+// ═══════════════════════════════════════════════════════════════════
+async function submitBooking() {
+  const a = appliances.find(x => x.id === state.selectedAppliance);
+  const body = {
+    appliance: a.name,
+    serviceType: state.selectedService,
+    description: document.getElementById('booking-desc').value,
+    preferredDate: document.getElementById('booking-date').value,
+    preferredTime: document.getElementById('booking-time').value,
+  };
+  try {
+    const r = await api('POST','/bookings', body);
+    toast('Booking submitted! Awaiting admin confirmation.','success');
+    setTimeout(()=>{ showPage('bookings'); loadBookings(); },1000);
+  } catch(e){ toast(e.message,'error'); }
+}
+
+// ═══════════════════════════════════════════════════════════════════
+//  LOGIN FLOW
+// ═══════════════════════════════════════════════════════════════════
+let pendingOTP = '';
+let pendingPhone = '';
+let verifiedSession = null; // store token+user after OTP verify so profile step doesn't re-verify
+
+function showLoginFor(afterPage) {
+  if(state.token){ 
+    if(afterPage) showPage(afterPage); 
+    return; 
+  }
+  state.afterLogin = afterPage;
+  showPage('login');
+  showLoginStep('phone');
+}
+
+function showLoginStep(step) {
+  document.getElementById('login-phone-step').style.display   = step==='phone'?'flex':'none';
+  document.getElementById('login-otp-step').style.display     = step==='otp'?'flex':'none';
+  document.getElementById('login-profile-step').style.display = step==='profile'?'flex':'none';
+  // Clear OTP boxes every time we show the OTP step
+  if(step === 'otp') {
+    [0,1,2,3,4,5].forEach(i => {
+      const el = document.getElementById('otp'+i);
+      el.value = '';
+    });
+    setTimeout(() => document.getElementById('otp0').focus(), 100);
+  }
+}
+
+async function sendOTP() {
+  const phone = document.getElementById('phone-input').value.trim();
+  if(phone.length !== 10){ toast('Enter valid 10-digit number','error'); return; }
+  pendingPhone = phone;
+  verifiedSession = null;
+  try {
+    const r = await fetch(`${API}/auth/send-otp`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({phone})});
+    const d = await r.json();
+    if(d.error) throw new Error(d.error);
+    pendingOTP = d.otp;
+    const otpMsg = d.otp ? `OTP sent! (Demo OTP: ${d.otp})` : 'OTP sent successfully';
+    toast(otpMsg,'success');
+    document.getElementById('otp-desc').textContent = `Enter the OTP sent to +91 ${phone}`;
+    showLoginStep('otp');
+  } catch(e){ toast(e.message,'error'); }
+}
+
+// FIX: Proper OTP input — handles typing, backspace, paste
+function otpInput(e, i) {
+  const box = document.getElementById('otp'+i);
+  const val = box.value;
+
+  // Allow only digits
+  box.value = val.replace(/\D/g,'').slice(-1);
+
+  if(box.value && i < 5) {
+    document.getElementById('otp'+(i+1)).focus();
+  }
+
+  // Auto-submit when all 6 filled
+  const full = [0,1,2,3,4,5].map(j=>document.getElementById('otp'+j).value).join('');
+  if(full.length === 6) verifyOTP();
+}
+
+function otpKeydown(e, i) {
+  // On backspace with empty box, go back
+  if(e.key === 'Backspace') {
+    const box = document.getElementById('otp'+i);
+    if(!box.value && i > 0) {
+      document.getElementById('otp'+(i-1)).value = '';
+      document.getElementById('otp'+(i-1)).focus();
+    }
+  }
+}
+
+function otpPaste(e) {
+  e.preventDefault();
+  const text = (e.clipboardData || window.clipboardData).getData('text').replace(/\D/g,'').slice(0,6);
+  text.split('').forEach((ch, i) => {
+    const el = document.getElementById('otp'+i);
+    if(el) el.value = ch;
+  });
+  const last = Math.min(text.length, 5);
+  document.getElementById('otp'+last).focus();
+  if(text.length === 6) setTimeout(verifyOTP, 200);
+}
+
+async function verifyOTP() {
+  const otp = [0,1,2,3,4,5].map(i=>document.getElementById('otp'+i).value).join('');
+  if(otp.length !== 6){ toast('Enter all 6 digits','error'); return; }
+
+  try {
+    const r = await fetch(`${API}/auth/verify-otp`,{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({phone:pendingPhone, otp})});
+    const d = await r.json();
+    if(d.error) throw new Error(d.error);
+
+    // Store the verified session so profile submit doesn't need to re-verify
+    verifiedSession = { token: d.token, user: d.user };
+
+    if(d.user && d.user.name && d.user.name !== 'User') {
+      // Existing user — login immediately
+      setSession(d.token, d.user);
+      toast('Welcome back, '+d.user.name+'! 👋','success');
+      afterLoginRedirect();
+    } else {
+      // New user — collect profile details
+      showLoginStep('profile');
+    }
+  } catch(e){ toast(e.message,'error'); }
+}
+
+async function submitProfile() {
+  const name = document.getElementById('reg-name').value.trim();
+  const location = document.getElementById('reg-location').value.trim();
+  const pinAddress = document.getElementById('reg-address').value.trim();
+  const pin = document.getElementById('reg-pin').value.trim();
+  if(!name){ toast('Enter your name','error'); return; }
+  if(!location){ toast('Enter your city/location','error'); return; }
+  if(!pinAddress){ toast('Enter your address','error'); return; }
+
+  try {
+    // Use the already-verified token to update profile — no need to re-verify OTP
+    const fullAddress = pinAddress + (pin ? ' – PIN: '+pin : '');
+    const r = await fetch(`${API}/user/profile`,{
+      method:'PUT',
+      headers:{'Content-Type':'application/json','Authorization':'Bearer '+verifiedSession.token},
+      body:JSON.stringify({name, location, pinAddress: fullAddress})
+    });
+    const d = await r.json();
+    if(d.error) throw new Error(d.error);
+
+    setSession(verifiedSession.token, d.user);
+    verifiedSession = null;
+    toast('Welcome to RK Consultancy, '+name+'! 🎉','success');
+    afterLoginRedirect();
+  } catch(e){ toast(e.message,'error'); }
+}
+
+function setSession(token, user) {
+  state.token = token;
+  state.user = user;
+  localStorage.setItem('token', token);
+  localStorage.setItem('user', JSON.stringify(user));
+  updateTopbar();
+}
+
+function afterLoginRedirect() {
+  if(state.afterLogin === 'service' && state.bookingAppliance) {
+    setTimeout(()=>openServicePage(state.bookingAppliance), 500);
+  } else if(state.afterLogin) {
+    setTimeout(()=>showPage(state.afterLogin), 500);
+  } else {
+    setTimeout(()=>showPage('home'), 500);
+  }
+  state.afterLogin = null;
+}
+
+function updateTopbar() {
+  const avatar = document.getElementById('topbar-avatar');
+  const loginBtn = document.getElementById('topbar-login');
+  const adminBtn = document.querySelector('#page-home .admin-link-btn');
+  const guestBanner = document.getElementById('guest-banner');
+  const isLoggedIn = Boolean(state.token && state.user);
+  if(isLoggedIn) {
+    avatar.style.display = 'flex';
+    avatar.textContent = state.user.name?state.user.name[0].toUpperCase():'U';
+    loginBtn.style.display = 'none';
+    if(adminBtn) adminBtn.style.display = 'none';
+    if(guestBanner) guestBanner.style.display = 'none';
+  } else {
+    avatar.style.display = 'none';
+    loginBtn.style.display = 'block';
+    if(adminBtn) adminBtn.style.display = 'block';
+    if(guestBanner) guestBanner.style.display = 'flex';
+  }
+}
+
+function logout() {
+  state.token = null; state.user = null;
+  localStorage.removeItem('token'); localStorage.removeItem('user');
+  updateTopbar();
+  showPage('home');
+  toast('Logged out successfully');
+}
+
+// ═══════════════════════════════════════════════════════════════════
+//  BOOKINGS PAGE
+// ═══════════════════════════════════════════════════════════════════
+async function loadBookings() {
+  const el = document.getElementById('bookings-list');
+  if(!state.token){
+    el.innerHTML = `<div class="empty-state"><div class="ei">🔐</div><h3>Login Required</h3><p>Please login to view your bookings</p><button class="btn btn-primary mt16" style="max-width:200px;margin:16px auto 0;" onclick="showLoginFor('bookings')">Login</button></div>`;
+    return;
+  }
+  el.innerHTML = `<div class="spinner"></div>`;
+  try {
+    const d = await api('GET','/bookings/my');
+    if(!d.bookings.length){
+      el.innerHTML=`<div class="empty-state"><div class="ei">📋</div><h3>No Bookings Yet</h3><p>Book a service to get started</p><button class="btn btn-primary mt16" style="max-width:200px;margin:16px auto 0;" onclick="switchTab('home')">Book Now</button></div>`;
+      return;
+    }
+    el.innerHTML = d.bookings.map(b=>`
+      <div class="booking-card">
+        <div class="bc-header">
+          <div>
+            <h4>${applianceIcon(b.appliance)} ${b.appliance}</h4>
+            <div class="bc-meta">${b.serviceType}</div>
+          </div>
+          <div class="badge badge-${b.status}">${b.status}</div>
+        </div>
+        <div class="bc-row">
+          <div class="bc-tag">📅 ${b.preferredDate}</div>
+          <div class="bc-tag">🕐 ${b.preferredTime}</div>
+        </div>
+        <div class="bc-row">
+          <div class="bc-tag">📍 ${b.userLocation}</div>
+        </div>
+        <p style="font-size:11px;color:var(--muted);margin-top:6px;">Booked on ${fmtDate(b.createdAt)}</p>
+      </div>
+    `).join('');
+  } catch(e){ el.innerHTML=`<p class="text-muted text-center" style="padding:32px;">${e.message}</p>`; }
+}
+
+// ═══════════════════════════════════════════════════════════════════
+//  PROFILE PAGE
+// ═══════════════════════════════════════════════════════════════════
+async function loadProfile() {
+  const el = document.getElementById('profile-content');
+  if(!state.token){
+    el.innerHTML=`<div class="empty-state"><div class="ei">👤</div><h3>Not Logged In</h3><p>Login to view your profile</p><button class="btn btn-primary mt16" style="max-width:200px;margin:16px auto 0;" onclick="showLoginFor('profile')">Login</button></div>`;
+    return;
+  }
+  try {
+    const [pd, bd] = await Promise.all([api('GET','/user/profile'), api('GET','/bookings/my')]);
+    const u = pd.user;
+    const bs = bd.bookings;
+    const confirmed = bs.filter(b=>b.status==='confirmed').length;
+    const pending = bs.filter(b=>b.status==='pending').length;
+    el.innerHTML = `
+      <div class="profile-hero">
+        <div class="profile-avatar">${u.name[0].toUpperCase()}</div>
+        <h2>${u.name}</h2>
+        <p>+91 ${u.phone}</p>
+      </div>
+      <div class="profile-stats">
+        <div class="stat-box"><div class="num">${bs.length}</div><div class="lbl">Total</div></div>
+        <div class="stat-box"><div class="num">${confirmed}</div><div class="lbl">Confirmed</div></div>
+        <div class="stat-box"><div class="num">${pending}</div><div class="lbl">Pending</div></div>
+      </div>
+      <div class="info-row"><div class="ir-icon">👤</div><div class="ir-text"><div class="ir-label">Full Name</div><div class="ir-val">${u.name}</div></div></div>
+      <div class="info-row"><div class="ir-icon">📱</div><div class="ir-text"><div class="ir-label">Phone</div><div class="ir-val">+91 ${u.phone}</div></div></div>
+      <div class="info-row"><div class="ir-icon">📍</div><div class="ir-text"><div class="ir-label">City / Location</div><div class="ir-val">${u.location||'Not set'}</div></div></div>
+      <div class="info-row"><div class="ir-icon">🏠</div><div class="ir-text"><div class="ir-label">Address</div><div class="ir-val">${u.pinAddress||'Not set'}</div></div></div>
+      <div class="info-row"><div class="ir-icon">📅</div><div class="ir-text"><div class="ir-label">Member Since</div><div class="ir-val">${fmtDate(u.createdAt)}</div></div></div>
+      <div style="padding:20px 20px 0;">
+        <div class="section-label" style="padding:0 0 12px;">Booking History</div>
+        ${bs.length ? bs.map(b=>`
+          <div class="booking-card" style="margin-bottom:10px;">
+            <div class="bc-header">
+              <div><h4>${applianceIcon(b.appliance)} ${b.appliance} – ${b.serviceType}</h4><div class="bc-meta">${b.preferredDate} | ${b.preferredTime}</div></div>
+              <div class="badge badge-${b.status}">${b.status}</div>
+            </div>
+          </div>
+        `).join('') : '<p class="text-muted">No bookings yet</p>'}
+      </div>
+      <button class="logout-btn" onclick="logout()">🚪 Logout</button>
+    `;
+  } catch(e){ el.innerHTML=`<p class="text-muted text-center" style="padding:32px;">${e.message}</p>`; }
+}
+
+// ═══════════════════════════════════════════════════════════════════
+//  ADMIN
+// ═══════════════════════════════════════════════════════════════════
+async function adminLogin() {
+  const username = document.getElementById('admin-username').value.trim();
+  const password = document.getElementById('admin-password').value;
+  try {
+    const r = await fetch(`${API}/admin/login`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username,password})});
+    const d = await r.json();
+    if(d.error) throw new Error(d.error);
+    state.adminToken = d.token;
+    localStorage.setItem('adminToken', d.token);
+    toast('Welcome, '+d.admin.name+'!','success');
+    showPage('admin');
+    loadAdminData('all');
+    loadAdminStats();
+  } catch(e){ toast(e.message,'error'); }
+}
+
+function adminLogout() {
+  state.adminToken = null;
+  localStorage.removeItem('adminToken');
+  showPage('home');
+}
+
+let currentAdminTab = 'all';
+function adminTab(tab) {
+  currentAdminTab = tab;
+  document.querySelectorAll('.tab-btn').forEach((b,i)=>{
+    b.classList.toggle('active', ['all','pending','confirmed','users'][i]===tab);
+  });
+  loadAdminData(tab);
+}
+
+async function loadAdminStats() {
+  try {
+    const d = await adminApi('GET','/admin/stats');
+    document.getElementById('st-total').textContent = d.total;
+    document.getElementById('st-pending').textContent = d.pending;
+    document.getElementById('st-confirmed').textContent = d.confirmed;
+  } catch(e){}
+}
+
+async function loadAdminData(tab) {
+  const el = document.getElementById('admin-content');
+  el.innerHTML = `<div class="spinner"></div>`;
+  try {
+    if(tab === 'users') {
+      const d = await adminApi('GET','/admin/users');
+      if(!d.users.length){ el.innerHTML=`<div class="empty-state"><div class="ei">👥</div><h3>No Users</h3></div>`; return; }
+      el.innerHTML = d.users.map(u=>`
+        <div class="admin-booking-card">
+          <div class="ab-top">
+            <div>
+              <h4>👤 ${u.name}</h4>
+              <div class="ab-info">📱 +91 ${u.phone}</div>
+              <div class="ab-info">📍 ${u.location||'—'} | ${u.pinAddress||'—'}</div>
+              <div class="ab-info" style="font-size:11px;color:var(--muted);">Joined ${fmtDate(u.createdAt)}</div>
+            </div>
+          </div>
+        </div>
+      `).join('');
+    } else {
+      const d = await adminApi('GET','/admin/bookings');
+      let bookings = d.bookings;
+      if(tab !== 'all') bookings = bookings.filter(b=>b.status===tab);
+      if(!bookings.length){ el.innerHTML=`<div class="empty-state"><div class="ei">📋</div><h3>No bookings</h3></div>`; return; }
+      el.innerHTML = bookings.map(b=>`
+        <div class="admin-booking-card" id="ab-${b.id}">
+          <div class="ab-top">
+            <div>
+              <h4>${applianceIcon(b.appliance)} ${b.appliance} – ${b.serviceType}</h4>
+              <div class="ab-info">👤 ${b.userName} | 📱 +91 ${b.userPhone}</div>
+              <div class="ab-info">📍 ${b.userLocation} | ${b.userPinAddress}</div>
+              <div class="ab-info">📅 ${b.preferredDate} | 🕐 ${b.preferredTime}</div>
+              ${b.description?`<div class="ab-info">📝 ${b.description}</div>`:''}
+            </div>
+            <div class="badge badge-${b.status}">${b.status}</div>
+          </div>
+          ${b.status==='pending'?`
+            <div class="action-row">
+              <button class="btn btn-success btn-sm" onclick="updateBooking('${b.id}','confirmed')">✓ Confirm</button>
+              <button class="btn btn-danger btn-sm" onclick="updateBooking('${b.id}','rejected')">✗ Reject</button>
+            </div>
+          `:b.status==='confirmed'?`
+            <div class="action-row">
+              <button class="btn btn-sm" style="background:#0a1a2e;color:var(--info);border:1px solid var(--info);" onclick="updateBooking('${b.id}','completed')">✓ Mark Complete</button>
+            </div>
+          `:''}
+          <p style="font-size:10px;color:var(--muted);margin-top:8px;">ID: ${b.id.slice(0,8)}... | ${fmtDate(b.createdAt)}</p>
+        </div>
+      `).join('');
+    }
+  } catch(e){ el.innerHTML=`<p class="text-muted text-center" style="padding:32px;">${e.message}</p>`; }
+}
+
+async function updateBooking(id, status) {
+  try {
+    await adminApi('PUT',`/admin/bookings/${id}`, {status});
+    toast(`Booking ${status}!`, status==='confirmed'?'success':'');
+    loadAdminData(currentAdminTab);
+    loadAdminStats();
+  } catch(e){ toast(e.message,'error'); }
+}
+
+// ═══════════════════════════════════════════════════════════════════
+//  API HELPERS
+// ═══════════════════════════════════════════════════════════════════
+async function api(method, path, body) {
+  const r = await fetch(API+path, {
+    method, headers:{'Content-Type':'application/json','Authorization':'Bearer '+state.token},
+    body: body ? JSON.stringify(body) : undefined
+  });
+  const d = await r.json();
+  if(d.error) throw new Error(d.error);
+  return d;
+}
+
+async function adminApi(method, path, body) {
+  const r = await fetch(API+path, {
+    method, headers:{'Content-Type':'application/json','Authorization':'Bearer '+state.adminToken},
+    body: body ? JSON.stringify(body) : undefined
+  });
+  const d = await r.json();
+  if(d.error) throw new Error(d.error);
+  return d;
+}
+
+// ═══════════════════════════════════════════════════════════════════
+//  NAVIGATION
+// ═══════════════════════════════════════════════════════════════════
+function showPage(name) {
+  state.prevPage = state.currentPage;
+  state.currentPage = name;
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.getElementById('page-'+name).classList.add('active');
+  if(name==='bookings') loadBookings();
+  if(name==='profile') loadProfile();
+  if(name==='admin' && state.adminToken) { loadAdminData(currentAdminTab); loadAdminStats(); }
+  if(name==='admin' && !state.adminToken) showPage('admin-login');
+  window.scrollTo(0,0);
+}
+
+function goBack() { showPage(state.prevPage || 'home'); }
+function goAdmin() { showPage(state.adminToken ? 'admin' : 'admin-login'); }
+function goProfile() {
+  if(state.token) switchTab('profile');
+  else showLoginFor('profile');
+}
+
+function switchTab(tab) {
+  if(tab==='bookings' && !state.token){ showLoginFor('bookings'); return; }
+  if(tab==='profile' && !state.token){ showLoginFor('profile'); return; }
+  showPage(tab);
+}
+
+// ═══════════════════════════════════════════════════════════════════
+//  UTILS
+// ═══════════════════════════════════════════════════════════════════
+function fmtDate(s) {
+  return new Date(s).toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric'});
+}
+
+function applianceIcon(name) {
+  const a = appliances.find(x=>x.name===name);
+  return a ? a.icon : '🔧';
+}
+
+function toast(msg, type='') {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'show '+(type||'');
+  setTimeout(()=>t.className='',3000);
+}
+
+// ═══════════════════════════════════════════════════════════════════
+//  SESSION VALIDATION
+// ═══════════════════════════════════════════════════════════════════
+async function validateSession() {
+  if (!state.token) {
+    state.user = null;
+    localStorage.removeItem('user');
+    updateTopbar();
+    return;
+  }
+  try {
+    const r = await fetch(`${API}/user/profile`, {
+      headers: { 'Authorization': 'Bearer ' + state.token }
+    });
+    if (!r.ok) {
+      // Token is invalid/expired — clear stale session
+      state.token = null;
+      state.user = null;
+      localStorage.removeItem('token');
+      localStorage.removeItem('user');
+      updateTopbar();
+      return;
+    }
+
+    const data = await r.json();
+    state.user = data.user || null;
+    if (state.user) {
+      localStorage.setItem('user', JSON.stringify(state.user));
+    }
+    updateTopbar();
+  } catch(e) {
+    // Keep token for retry, but don't show logged-in UI until verified.
+    state.user = null;
+    updateTopbar();
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════
+//  START
+// ═══════════════════════════════════════════════════════════════════
+init();
+validateSession();
+checkBackend();
+
+</script>
+</body>
+</html>
