@@ -2,50 +2,92 @@ require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const bodyParser = require('body-parser');
-const { v4: uuidv4 } = require('uuid');
 const jwt = require('jsonwebtoken');
 const axios = require('axios');
+const mongoose = require('mongoose');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
 const JWT_SECRET = process.env.JWT_SECRET || 'appliance_service_secret_2024';
 const FAST2SMS_API_KEY = process.env.FAST2SMS_API_KEY;
-const NODE_ENV = process.env.NODE_ENV || 'development';
-const OTP_FALLBACK_TO_CONSOLE = NODE_ENV !== 'production' && process.env.OTP_FALLBACK_TO_CONSOLE !== 'false';
-const OTP_INCLUDE_IN_RESPONSE = process.env.OTP_INCLUDE_IN_RESPONSE === 'true' || NODE_ENV !== 'production';
-const OTP_EXPIRY_MS = Number(process.env.OTP_EXPIRY_MS || 5 * 60 * 1000);
-const OTP_RESEND_COOLDOWN_MS = Number(process.env.OTP_RESEND_COOLDOWN_MS || 30 * 1000);
-const OTP_RATE_LIMIT_WINDOW_MS = Number(process.env.OTP_RATE_LIMIT_WINDOW_MS || 10 * 60 * 1000);
-const OTP_RATE_LIMIT_MAX_REQUESTS = Number(process.env.OTP_RATE_LIMIT_MAX_REQUESTS || 5);
-const FAST2SMS_DLT_ENABLED = process.env.FAST2SMS_DLT_ENABLED === 'true';
-const FAST2SMS_DLT_SENDER_ID = process.env.FAST2SMS_DLT_SENDER_ID || '';
-const FAST2SMS_DLT_ENTITY_ID = process.env.FAST2SMS_DLT_ENTITY_ID || '';
-const FAST2SMS_DLT_TEMPLATE_ID = process.env.FAST2SMS_DLT_TEMPLATE_ID || '';
-const FAST2SMS_DLT_MESSAGE_TEMPLATE = process.env.FAST2SMS_DLT_MESSAGE_TEMPLATE || '';
+const ADMIN_PHONE_NUMBER = process.env.ADMIN_PHONE_NUMBER || '';
+const MONGO_URI = process.env.MONGO_URI;
 
-// app.use(cors());
-// app.use(bodyParser.json());
+// ─── ENV VALIDATION ────────────────────────────────────────────────────────
+if (!MONGO_URI) {
+  console.error('❌ MONGO_URI is missing in .env file!');
+  process.exit(1);
+}
+if (!FAST2SMS_API_KEY) {
+  console.warn('⚠️  FAST2SMS_API_KEY is missing. SMS will not be sent.');
+}
 
-app.use(cors({
-  origin: '*',
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization']
-}));
-app.options('/{*path}', cors());
+app.use(cors({ origin: '*' }));
 app.use(bodyParser.json());
 
+// ─── ASYNC HANDLER WRAPPER ─────────────────────────────────────────────────
+const asyncHandler = (fn) => (req, res, next) =>
+  Promise.resolve(fn(req, res, next)).catch(next);
 
+// ─── MONGODB CONNECTION ────────────────────────────────────────────────────
+mongoose
+  .connect(MONGO_URI)
+  .then(() => console.log('✅ Connected to MongoDB!'))
+  .catch((err) => {
+    console.error('❌ MongoDB connection error:', err.message);
+    process.exit(1);
+  });
 
-// ─── IN-MEMORY DATABASE ────────────────────────────────────────────────────
-const db = {
-  users: {},       // phone -> { id, name, phone, location, pinAddress, createdAt }
-  otps: {},        // phone -> { otp, expiresAt }
-  otpMeta: {},     // phone -> { lastSentAt }
-  otpRateLimit: {}, // key(phone+ip) -> { count, windowStart }
-  bookings: [],    // []
-  admins: {
-    'admin': { password: 'Admin@1234', name: 'Super Admin' }
-  }
+mongoose.connection.on('disconnected', () =>
+  console.warn('⚠️  MongoDB disconnected. Attempting to reconnect...')
+);
+mongoose.connection.on('reconnected', () =>
+  console.log('✅ MongoDB reconnected.')
+);
+
+// ─── MONGOOSE MODELS ───────────────────────────────────────────────────────
+const UserSchema = new mongoose.Schema({
+  name: { type: String, default: 'User' },
+  phone: { type: String, required: true, unique: true },
+  location: { type: String, default: '' },
+  pinAddress: { type: String, default: '' },
+  createdAt: { type: Date, default: Date.now },
+});
+const User = mongoose.model('User', UserSchema);
+
+const BookingSchema = new mongoose.Schema({
+  userId: String,
+  userName: String,
+  userPhone: String,
+  userLocation: String,
+  userPinAddress: String,
+  appliance: String,
+  serviceType: String,
+  description: String,
+  preferredDate: String,
+  preferredTime: String,
+  status: {
+    type: String,
+    enum: ['pending', 'confirmed', 'rejected', 'completed'],
+    default: 'pending',
+  },
+  createdAt: { type: Date, default: Date.now },
+  updatedAt: { type: Date, default: Date.now },
+});
+const Booking = mongoose.model('Booking', BookingSchema);
+
+const OtpSchema = new mongoose.Schema({
+  phone: { type: String, required: true, unique: true },
+  otp: String,
+  expiresAt: Number,
+  attempts: { type: Number, default: 0 },
+  lastSentAt: { type: Number, default: 0 },
+});
+const Otp = mongoose.model('Otp', OtpSchema);
+
+// In-memory admin store (extend to DB if needed)
+const admins = {
+  admin: { password: 'Admin@1234', name: 'Super Admin' },
 };
 
 // ─── HELPERS ───────────────────────────────────────────────────────────────
@@ -53,338 +95,376 @@ function generateOTP() {
   return Math.floor(100000 + Math.random() * 900000).toString();
 }
 
-function isFast2SmsAccepted(providerData) {
-  return providerData?.return === true && !providerData?.status_code;
+function normalizePhone(phone) {
+  return String(phone || '').trim().replace(/\D/g, '').slice(-10);
 }
 
-function buildFast2SmsError(providerData, fallbackMessage) {
-  const err = new Error(fallbackMessage);
-  err.providerData = providerData;
-  return err;
-}
+async function sendViaFast2SMS(phone, otp) {
+  if (!FAST2SMS_API_KEY) throw new Error('Fast2SMS API key not configured');
 
-async function sendViaFast2SmsOtpRoute(phone, otp) {
-  const smsResponse = await axios.post(
+  const response = await axios.post(
     'https://www.fast2sms.com/dev/bulkV2',
     {
-      route: 'otp',
-      variables_values: otp,
-      numbers: phone,
-      flash: 0
-    },
-    {
-      headers: {
-        authorization: FAST2SMS_API_KEY,
-        'Content-Type': 'application/json'
-      }
-    }
-  );
-
-  const providerData = smsResponse?.data || {};
-  if (!isFast2SmsAccepted(providerData)) {
-    throw buildFast2SmsError(providerData, 'Fast2SMS OTP route rejected request');
-  }
-
-  return providerData;
-}
-
-async function sendViaFast2SmsDltRoute(phone, otp) {
-  if (!FAST2SMS_DLT_ENABLED) {
-    throw new Error('DLT fallback is disabled');
-  }
-
-  if (!FAST2SMS_DLT_SENDER_ID || !FAST2SMS_DLT_ENTITY_ID || !FAST2SMS_DLT_TEMPLATE_ID || !FAST2SMS_DLT_MESSAGE_TEMPLATE) {
-    throw new Error('DLT fallback is not configured. Set sender/entity/template/message env values.');
-  }
-
-  const message = FAST2SMS_DLT_MESSAGE_TEMPLATE.replace('{otp}', otp);
-
-  const smsResponse = await axios.post(
-    'https://www.fast2sms.com/dev/bulkV2',
-    {
-      route: 'dlt',
-      sender_id: FAST2SMS_DLT_SENDER_ID,
-      message,
+      route: 'q',
+      message: `Your verification OTP is ${otp}. Valid for 5 minutes. Do not share it.`,
       numbers: phone,
       flash: 0,
-      language: 'english',
-      entity_id: FAST2SMS_DLT_ENTITY_ID,
-      template_id: FAST2SMS_DLT_TEMPLATE_ID
     },
     {
       headers: {
         authorization: FAST2SMS_API_KEY,
-        'Content-Type': 'application/json'
-      }
+        'Content-Type': 'application/json',
+      },
+      timeout: 10000,
     }
   );
 
-  const providerData = smsResponse?.data || {};
-  if (!isFast2SmsAccepted(providerData)) {
-    throw buildFast2SmsError(providerData, 'Fast2SMS DLT route rejected request');
+  if (response?.data?.return !== true) {
+    const errMsg = response?.data?.message || 'Fast2SMS rejected request';
+    const statusCode = response?.data?.status_code;
+    console.error(`Fast2SMS error: status_code=${statusCode}, message=${errMsg}`);
+    throw new Error(`Fast2SMS: ${errMsg} (code: ${statusCode})`);
   }
 
-  return providerData;
+  return response.data;
 }
 
+async function sendAdminNotificationSms(messageText) {
+  if (!ADMIN_PHONE_NUMBER || !FAST2SMS_API_KEY) return;
+  const phone = normalizePhone(ADMIN_PHONE_NUMBER);
+  if (phone.length !== 10) {
+    console.warn(`⚠️  ADMIN_PHONE_NUMBER "${ADMIN_PHONE_NUMBER}" is invalid. Skipping SMS.`);
+    return;
+  }
+  try {
+    await axios.post(
+      'https://www.fast2sms.com/dev/bulkV2',
+      { route: 'q', message: messageText, numbers: phone, flash: 0 },
+      {
+        headers: { authorization: FAST2SMS_API_KEY, 'Content-Type': 'application/json' },
+        timeout: 10000,
+      }
+    );
+  } catch (err) {
+    console.error('[Admin SMS] Failed:', err.message);
+  }
+}
+
+// ─── MIDDLEWARE ────────────────────────────────────────────────────────────
 function authMiddleware(req, res, next) {
   const token = req.headers['authorization']?.split(' ')[1];
-  if (!token) return res.status(401).json({ error: 'No token' });
+  if (!token) return res.status(401).json({ error: 'No token provided' });
   try {
     req.user = jwt.verify(token, JWT_SECRET);
     next();
   } catch {
-    res.status(401).json({ error: 'Invalid token' });
+    res.status(401).json({ error: 'Invalid or expired token' });
   }
 }
 
 function adminMiddleware(req, res, next) {
   const token = req.headers['authorization']?.split(' ')[1];
-  if (!token) return res.status(401).json({ error: 'No token' });
+  if (!token) return res.status(401).json({ error: 'No token provided' });
   try {
     const decoded = jwt.verify(token, JWT_SECRET);
-    if (decoded.role !== 'admin') return res.status(403).json({ error: 'Forbidden' });
+    if (decoded.role !== 'admin')
+      return res.status(403).json({ error: 'Admin access required' });
     req.admin = decoded;
     next();
   } catch {
-    res.status(401).json({ error: 'Invalid token' });
+    res.status(401).json({ error: 'Invalid or expired token' });
   }
 }
 
-app.get('/api/health', (req, res) => res.json({ ok: true }));
-
 // ─── AUTH ROUTES ───────────────────────────────────────────────────────────
 
-// Send OTP
-app.post('/api/auth/send-otp', async (req, res) => {
-  const { phone } = req.body;
-  if (!phone || phone.length < 10) return res.status(400).json({ error: 'Invalid phone number' });
+// POST /api/auth/send-otp
+app.post(
+  '/api/auth/send-otp',
+  asyncHandler(async (req, res) => {
+    const { phone } = req.body;
+    const normalizedPhone = normalizePhone(phone);
 
-  const normalizedPhone = String(phone).trim();
-  const now = Date.now();
-  const ip = req.headers['x-forwarded-for']?.split(',')[0]?.trim() || req.socket.remoteAddress || 'unknown';
-
-  const rateKey = `${normalizedPhone}|${ip}`;
-  const currentRate = db.otpRateLimit[rateKey];
-  if (!currentRate || now - currentRate.windowStart >= OTP_RATE_LIMIT_WINDOW_MS) {
-    db.otpRateLimit[rateKey] = { count: 1, windowStart: now };
-  } else {
-    currentRate.count += 1;
-    if (currentRate.count > OTP_RATE_LIMIT_MAX_REQUESTS) {
-      const retryInSec = Math.ceil((OTP_RATE_LIMIT_WINDOW_MS - (now - currentRate.windowStart)) / 1000);
-      return res.status(429).json({ error: `Too many OTP requests. Try again in ${retryInSec}s.` });
-    }
-  }
-
-  const otpMeta = db.otpMeta[normalizedPhone];
-  if (otpMeta && now - otpMeta.lastSentAt < OTP_RESEND_COOLDOWN_MS) {
-    const retryInSec = Math.ceil((OTP_RESEND_COOLDOWN_MS - (now - otpMeta.lastSentAt)) / 1000);
-    return res.status(429).json({ error: `Please wait ${retryInSec}s before requesting a new OTP.` });
-  }
-
-  const otp = generateOTP();
-  db.otps[normalizedPhone] = { otp, expiresAt: now + OTP_EXPIRY_MS };
-  db.otpMeta[normalizedPhone] = { lastSentAt: now };
-
-  const successPayload = {
-    success: true,
-    message: 'OTP sent successfully'
-  };
-
-  if (OTP_INCLUDE_IN_RESPONSE) {
-    successPayload.otp = otp;
-  }
-
-  try {
-    if (!FAST2SMS_API_KEY) {
-      throw new Error('FAST2SMS_API_KEY is not configured');
+    if (normalizedPhone.length !== 10) {
+      return res.status(400).json({ error: 'Invalid phone number. Must be 10 digits.' });
     }
 
-    const otpRouteData = await sendViaFast2SmsOtpRoute(normalizedPhone, otp);
-    console.log('Fast2SMS OTP route accepted:', {
-      phone: `+91${normalizedPhone}`,
-      requestId: otpRouteData?.request_id || null,
-      returnStatus: otpRouteData?.return || null
-    });
-    return res.json(successPayload);
-  } catch (err) {
-    const providerErrorData = err?.response?.data || err?.providerData;
-    const providerError = providerErrorData || err.message;
-    const providerStatusCode = providerErrorData?.status_code;
+    const now = Date.now();
+    const RESEND_COOLDOWN = parseInt(process.env.OTP_RESEND_COOLDOWN_MS) || 30000;
+    const OTP_EXPIRY = parseInt(process.env.OTP_EXPIRY_MS) || 300000;
 
-    if (providerStatusCode === 996) {
-      console.warn('Fast2SMS OTP route blocked with 996, attempting DLT fallback...');
-      try {
-        const dltRouteData = await sendViaFast2SmsDltRoute(normalizedPhone, otp);
-        console.log('Fast2SMS DLT route accepted:', {
-          phone: `+91${normalizedPhone}`,
-          requestId: dltRouteData?.request_id || null,
-          returnStatus: dltRouteData?.return || null
-        });
-        return res.json({
-          ...successPayload,
-          message: 'OTP sent successfully via DLT route'
-        });
-      } catch (dltErr) {
-        const dltProviderErrorData = dltErr?.response?.data || dltErr?.providerData;
-        const dltProviderError = dltProviderErrorData || dltErr.message;
-        console.error('Fast2SMS DLT fallback failed:', dltProviderError);
-      }
-    }
-
-    console.error('Fast2SMS error:', providerError);
-
-    if (OTP_FALLBACK_TO_CONSOLE) {
-      console.warn(`OTP fallback mode active for +91${normalizedPhone}`);
-      console.log(`[OTP:FALLBACK] +91${normalizedPhone} => ${otp}`);
-      return res.json({
-        ...successPayload,
-        message: 'OTP generated in fallback mode'
+    // Check resend cooldown
+    const existingOtp = await Otp.findOne({ phone: normalizedPhone });
+    if (existingOtp && now - existingOtp.lastSentAt < RESEND_COOLDOWN) {
+      const waitSecs = Math.ceil((RESEND_COOLDOWN - (now - existingOtp.lastSentAt)) / 1000);
+      return res.status(429).json({
+        error: `Please wait ${waitSecs} seconds before requesting another OTP.`,
       });
     }
 
-    return res.status(500).json({ error: 'Failed to send OTP. Please try again.' });
-  }
-});
+    const otp = generateOTP();
 
-// Verify OTP
-app.post('/api/auth/verify-otp', (req, res) => {
-  const { phone, otp, name, location, pinAddress } = req.body;
-  const normalizedPhone = String(phone || '').trim();
+    await Otp.findOneAndUpdate(
+      { phone: normalizedPhone },
+      { otp, expiresAt: now + OTP_EXPIRY, lastSentAt: now, attempts: 0 },
+      { upsert: true, new: true }
+    );
 
-  const stored = db.otps[normalizedPhone];
-  if (!stored) return res.status(400).json({ error: 'OTP not sent' });
-  if (Date.now() > stored.expiresAt) return res.status(400).json({ error: 'OTP expired' });
-  if (stored.otp !== otp) return res.status(400).json({ error: 'Invalid OTP' });
+    try {
+      await sendViaFast2SMS(normalizedPhone, otp);
+      console.log(`[OTP] Sent via Fast2SMS to ${normalizedPhone}`);
+      return res.json({ success: true, message: 'OTP sent successfully' });
+    } catch (smsErr) {
+      console.warn(`[OTP:FALLBACK] SMS failed for ${normalizedPhone}: ${smsErr.message}`);
+      // Fallback: return OTP in response only in non-production or if flag set
+      const includeOtp =
+        process.env.NODE_ENV !== 'production' ||
+        process.env.OTP_INCLUDE_IN_RESPONSE === 'true';
+      return res.json({
+        success: true,
+        message: 'OTP generated (SMS delivery failed). Check console or use fallback OTP.',
+        ...(includeOtp && { otp }),
+      });
+    }
+  })
+);
 
-  delete db.otps[normalizedPhone];
+// POST /api/auth/verify-otp
+app.post(
+  '/api/auth/verify-otp',
+  asyncHandler(async (req, res) => {
+    const { phone, otp, name, location, pinAddress } = req.body;
+    const normalizedPhone = normalizePhone(phone);
 
-  // Create or update user
-  if (!db.users[normalizedPhone]) {
-    db.users[normalizedPhone] = {
-      id: uuidv4(),
-      name: name || 'User',
-      phone: normalizedPhone,
-      location: location || '',
-      pinAddress: pinAddress || '',
-      createdAt: new Date().toISOString()
-    };
-  } else {
-    if (name) db.users[normalizedPhone].name = name;
-    if (location) db.users[normalizedPhone].location = location;
-    if (pinAddress) db.users[normalizedPhone].pinAddress = pinAddress;
-  }
+    if (!normalizedPhone || !otp) {
+      return res.status(400).json({ error: 'Phone and OTP are required' });
+    }
 
-  const user = db.users[normalizedPhone];
-  const token = jwt.sign({ id: user.id, phone: normalizedPhone, role: 'user' }, JWT_SECRET, { expiresIn: '7d' });
+    const stored = await Otp.findOne({ phone: normalizedPhone });
+    if (!stored) return res.status(400).json({ error: 'OTP not sent or already used' });
+    if (Date.now() > stored.expiresAt)
+      return res.status(400).json({ error: 'OTP has expired. Please request a new one.' });
+    if (stored.otp !== String(otp).trim())
+      return res.status(400).json({ error: 'Invalid OTP' });
 
-  res.json({ success: true, token, user });
-});
+    await Otp.deleteOne({ phone: normalizedPhone });
+
+    let user = await User.findOne({ phone: normalizedPhone });
+    if (!user) {
+      user = await User.create({
+        phone: normalizedPhone,
+        name: name || 'User',
+        location: location || '',
+        pinAddress: pinAddress || '',
+      });
+    } else {
+      if (name) user.name = name;
+      if (location) user.location = location;
+      if (pinAddress) user.pinAddress = pinAddress;
+      await user.save();
+    }
+
+    const token = jwt.sign(
+      { id: user._id, phone: normalizedPhone, role: 'user' },
+      JWT_SECRET,
+      { expiresIn: '7d' }
+    );
+
+    res.json({ success: true, token, user });
+  })
+);
 
 // ─── USER ROUTES ───────────────────────────────────────────────────────────
 
-// Get profile
-app.get('/api/user/profile', authMiddleware, (req, res) => {
-  const user = db.users[req.user.phone];
-  if (!user) return res.status(404).json({ error: 'User not found' });
-  res.json({ user });
-});
+// GET /api/user/profile
+app.get(
+  '/api/user/profile',
+  authMiddleware,
+  asyncHandler(async (req, res) => {
+    const user = await User.findOne({ phone: req.user.phone });
+    if (!user)
+      return res.status(404).json({ error: 'User not found. Please log in again.' });
+    res.json({ user });
+  })
+);
 
-// Update profile
-app.put('/api/user/profile', authMiddleware, (req, res) => {
-  const { name, location, pinAddress } = req.body;
-  const user = db.users[req.user.phone];
-  if (!user) return res.status(404).json({ error: 'User not found' });
-  if (name) user.name = name;
-  if (location) user.location = location;
-  if (pinAddress) user.pinAddress = pinAddress;
-  res.json({ success: true, user });
-});
+// PUT /api/user/profile
+app.put(
+  '/api/user/profile',
+  authMiddleware,
+  asyncHandler(async (req, res) => {
+    const { name, location, pinAddress } = req.body;
+    const user = await User.findOneAndUpdate(
+      { phone: req.user.phone },
+      { name, location, pinAddress },
+      { new: true }
+    );
+    if (!user) return res.status(404).json({ error: 'User not found' });
+    res.json({ success: true, user });
+  })
+);
 
 // ─── BOOKING ROUTES ────────────────────────────────────────────────────────
 
-// Create booking
-app.post('/api/bookings', authMiddleware, (req, res) => {
-  const { appliance, serviceType, description, preferredDate, preferredTime } = req.body;
-  const user = db.users[req.user.phone];
+// POST /api/bookings
+app.post(
+  '/api/bookings',
+  authMiddleware,
+  asyncHandler(async (req, res) => {
+    const { appliance, serviceType, description, preferredDate, preferredTime } = req.body;
 
-  const booking = {
-    id: uuidv4(),
-    userId: user.id,
-    userName: user.name,
-    userPhone: user.phone,
-    userLocation: user.location,
-    userPinAddress: user.pinAddress,
-    appliance,
-    serviceType,
-    description: description || '',
-    preferredDate,
-    preferredTime,
-    status: 'pending', // pending | confirmed | rejected | completed
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString()
-  };
+    if (!appliance || !serviceType || !preferredDate || !preferredTime) {
+      return res.status(400).json({
+        error: 'appliance, serviceType, preferredDate, and preferredTime are required.',
+      });
+    }
 
-  db.bookings.push(booking);
-  res.json({ success: true, booking });
-});
+    const user = await User.findOne({ phone: req.user.phone });
+    if (!user)
+      return res.status(401).json({ error: 'User session expired. Log in again.' });
 
-// Get user bookings
-app.get('/api/bookings/my', authMiddleware, (req, res) => {
-  const user = db.users[req.user.phone];
-  const myBookings = db.bookings
-    .filter(b => b.userId === user.id)
-    .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-  res.json({ bookings: myBookings });
-});
+    const booking = await Booking.create({
+      userId: user._id,
+      userName: user.name,
+      userPhone: user.phone,
+      userLocation: user.location,
+      userPinAddress: user.pinAddress,
+      appliance,
+      serviceType,
+      description: description || '',
+      preferredDate,
+      preferredTime,
+    });
+
+    const adminMessage = `New Booking! ${user.name} (${user.phone}) booked ${serviceType} for ${appliance}. Date: ${preferredDate} at ${preferredTime}.`;
+    sendAdminNotificationSms(adminMessage); // fire-and-forget
+
+    res.status(201).json({ success: true, booking });
+  })
+);
+
+// GET /api/bookings/my
+app.get(
+  '/api/bookings/my',
+  authMiddleware,
+  asyncHandler(async (req, res) => {
+    const myBookings = await Booking.find({ userPhone: req.user.phone }).sort({
+      createdAt: -1,
+    });
+    res.json({ bookings: myBookings });
+  })
+);
 
 // ─── ADMIN ROUTES ──────────────────────────────────────────────────────────
 
-// Admin login
+// POST /api/admin/login
 app.post('/api/admin/login', (req, res) => {
   const { username, password } = req.body;
-  const admin = db.admins[username];
-  if (!admin || admin.password !== password) {
+  if (!username || !password)
+    return res.status(400).json({ error: 'Username and password required' });
+
+  const admin = admins[username];
+  if (!admin || admin.password !== password)
     return res.status(401).json({ error: 'Invalid credentials' });
-  }
-  const token = jwt.sign({ username, role: 'admin', name: admin.name }, JWT_SECRET, { expiresIn: '8h' });
+
+  const token = jwt.sign(
+    { username, role: 'admin', name: admin.name },
+    JWT_SECRET,
+    { expiresIn: '8h' }
+  );
   res.json({ success: true, token, admin: { username, name: admin.name } });
 });
 
-// Get all bookings
-app.get('/api/admin/bookings', adminMiddleware, (req, res) => {
-  const sorted = [...db.bookings].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-  res.json({ bookings: sorted });
+// GET /api/admin/bookings
+app.get(
+  '/api/admin/bookings',
+  adminMiddleware,
+  asyncHandler(async (req, res) => {
+    const { status, page = 1, limit = 50 } = req.query;
+    const filter = status ? { status } : {};
+    const bookings = await Booking.find(filter)
+      .sort({ createdAt: -1 })
+      .skip((page - 1) * limit)
+      .limit(parseInt(limit));
+    const total = await Booking.countDocuments(filter);
+    res.json({ bookings, total, page: parseInt(page), limit: parseInt(limit) });
+  })
+);
+
+// PUT /api/admin/bookings/:id
+app.put(
+  '/api/admin/bookings/:id',
+  adminMiddleware,
+  asyncHandler(async (req, res) => {
+    const { status } = req.body;
+    const validStatuses = ['pending', 'confirmed', 'rejected', 'completed'];
+    if (!validStatuses.includes(status)) {
+      return res.status(400).json({ error: `status must be one of: ${validStatuses.join(', ')}` });
+    }
+
+    const booking = await Booking.findByIdAndUpdate(
+      req.params.id,
+      { status, updatedAt: new Date() },
+      { new: true }
+    );
+    if (!booking) return res.status(404).json({ error: 'Booking not found' });
+    res.json({ success: true, booking });
+  })
+);
+
+// GET /api/admin/users
+app.get(
+  '/api/admin/users',
+  adminMiddleware,
+  asyncHandler(async (req, res) => {
+    const users = await User.find().sort({ createdAt: -1 });
+    res.json({ users });
+  })
+);
+
+// GET /api/admin/stats
+app.get(
+  '/api/admin/stats',
+  adminMiddleware,
+  asyncHandler(async (req, res) => {
+    const [total, pending, confirmed, completed, rejected, users] = await Promise.all([
+      Booking.countDocuments(),
+      Booking.countDocuments({ status: 'pending' }),
+      Booking.countDocuments({ status: 'confirmed' }),
+      Booking.countDocuments({ status: 'completed' }),
+      Booking.countDocuments({ status: 'rejected' }),
+      User.countDocuments(),
+    ]);
+    res.json({ total, pending, confirmed, completed, rejected, users });
+  })
+);
+
+// ─── HEALTH CHECK ──────────────────────────────────────────────────────────
+app.get('/api/health', (req, res) => {
+  res.json({
+    status: 'ok',
+    db: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected',
+    uptime: process.uptime(),
+  });
 });
 
-// Update booking status
-app.put('/api/admin/bookings/:id', adminMiddleware, (req, res) => {
-  const { status } = req.body;
-  const booking = db.bookings.find(b => b.id === req.params.id);
-  if (!booking) return res.status(404).json({ error: 'Booking not found' });
-  booking.status = status;
-  booking.updatedAt = new Date().toISOString();
-  res.json({ success: true, booking });
+// ─── 404 HANDLER ──────────────────────────────────────────────────────────
+app.use((req, res) => {
+  res.status(404).json({ error: `Route ${req.method} ${req.path} not found` });
 });
 
-// Get all users
-app.get('/api/admin/users', adminMiddleware, (req, res) => {
-  const users = Object.values(db.users);
-  res.json({ users });
+// ─── GLOBAL ERROR HANDLER ─────────────────────────────────────────────────
+app.use((err, req, res, next) => {
+  console.error('❌ Unhandled error:', err.message);
+  if (process.env.NODE_ENV !== 'production') {
+    console.error(err.stack);
+  }
+  res.status(500).json({ error: 'Internal server error', detail: err.message });
 });
 
-// Stats
-app.get('/api/admin/stats', adminMiddleware, (req, res) => {
-  const total = db.bookings.length;
-  const pending = db.bookings.filter(b => b.status === 'pending').length;
-  const confirmed = db.bookings.filter(b => b.status === 'confirmed').length;
-  const completed = db.bookings.filter(b => b.status === 'completed').length;
-  const rejected = db.bookings.filter(b => b.status === 'rejected').length;
-  const users = Object.keys(db.users).length;
-  res.json({ total, pending, confirmed, completed, rejected, users });
-});
-
+// ─── START SERVER ─────────────────────────────────────────────────────────
 app.listen(PORT, () => {
   console.log(`✅ Server running on http://localhost:${PORT}`);
   console.log(`🔐 Admin: username=admin, password=Admin@1234`);
+  console.log(`🩺 Health: http://localhost:${PORT}/api/health`);
 });
