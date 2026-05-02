@@ -738,7 +738,8 @@ async function checkBackend() {
 const state = {
   token: localStorage.getItem('token') || null,
   user: null,
-  adminToken: localStorage.getItem('adminToken') || null,
+  // adminToken: localStorage.getItem('adminToken') || null,
+  adminToken: null, // Disable admin login for now
   currentPage: 'home',
   prevPage: 'home',
   selectedAppliance: null,
@@ -1237,7 +1238,7 @@ async function adminLogin() {
     const d = await r.json();
     if(d.error) throw new Error(d.error);
     state.adminToken = d.token;
-    localStorage.setItem('adminToken', d.token);
+    // localStorage.setItem('adminToken', d.token);
     toast('Welcome, '+d.admin.name+'!','success');
     showPage('admin');
     loadAdminData('all');
@@ -1247,7 +1248,6 @@ async function adminLogin() {
 
 function adminLogout() {
   state.adminToken = null;
-  localStorage.removeItem('adminToken');
   showPage('home');
 }
 
