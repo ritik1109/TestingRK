@@ -454,6 +454,11 @@ app.get('/api/health', (req, res) => {
   });
 });
 
+
+// ─── ROOT ROUTE ───────────────────────────────────────────────────────────  ← ADD THIS
+app.get('/', (req, res) => res.json({ message: '🔧 Appliance Service API is running' }));
+
+
 // ─── 404 HANDLER ──────────────────────────────────────────────────────────
 app.use((req, res) => {
   res.status(404).json({ error: `Route ${req.method} ${req.path} not found` });
