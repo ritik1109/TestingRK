@@ -714,7 +714,7 @@ const API = 'https://rk-consultancy.onrender.com/api';
 // ─── CHECK BACKEND CONNECTION ───────────────────────────────────────
 async function checkBackend() {
   try {
-    const r = await fetch(`${API}/health`, { signal: AbortSignal.timeout(3000) });
+    const r = await fetch(`${API}/health`, { signal: AbortSignal.timeout(15000) });
   } catch(e) {
     document.body.insertAdjacentHTML('afterbegin', `
       <div id="backend-warning" style="
@@ -1289,12 +1289,12 @@ async function loadAdminData(tab) {
         </div>
       `).join('');
     } else {
-      const d = await adminApi('GET','/admin/bookings');
-      let bookings = d.bookings;
-      if(tab !== 'all') bookings = bookings.filter(b=>b.status===tab);
+      const url = tab !== 'all' ? `/admin/bookings?status=${tab}` : '/admin/bookings';
+      const d = await adminApi('GET', url);
+      const bookings = d.bookings;
       if(!bookings.length){ el.innerHTML=`<div class="empty-state"><div class="ei">📋</div><h3>No bookings</h3></div>`; return; }
       el.innerHTML = bookings.map(b=>`
-        <div class="admin-booking-card" id="ab-${b.id}">
+         <div class="admin-booking-card" id="ab-${b._id}">
           <div class="ab-top">
             <div>
               <h4>${applianceIcon(b.appliance)} ${b.appliance} – ${b.serviceType}</h4>
@@ -1307,15 +1307,16 @@ async function loadAdminData(tab) {
           </div>
           ${b.status==='pending'?`
             <div class="action-row">
-              <button class="btn btn-success btn-sm" onclick="updateBooking('${b.id}','confirmed')">✓ Confirm</button>
-              <button class="btn btn-danger btn-sm" onclick="updateBooking('${b.id}','rejected')">✗ Reject</button>
+              <button class="btn btn-success btn-sm" onclick="updateBooking('${b._id}','confirmed')">✓ Confirm</button>
+              <button class="btn btn-danger btn-sm" onclick="updateBooking('${b._id}','rejected')">✗ Reject</button>
             </div>
           `:b.status==='confirmed'?`
             <div class="action-row">
-              <button class="btn btn-sm" style="background:#0a1a2e;color:var(--info);border:1px solid var(--info);" onclick="updateBooking('${b.id}','completed')">✓ Mark Complete</button>
+              <button class="btn btn-sm" style="background:#0a1a2e;color:var(--info);border:1px solid var(--info);" onclick="updateBooking('${b._id}','completed')">✓ Mark Complete</button>
             </div>
           `:''}
-          <p style="font-size:10px;color:var(--muted);margin-top:8px;">ID: ${b.id.slice(0,8)}... | ${fmtDate(b.createdAt)}</p>
+          <p style="font-size:10px;color:var(--muted);margin-top:8px;">ID: ${b._id.toString().slice(0,8)}... | ${fmtDate(b.createdAt)}</p>
+
         </div>
       `).join('');
     }
