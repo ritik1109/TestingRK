@@ -27,7 +27,12 @@ if (!FAST2SMS_API_KEY) {
 }
 
 // Enable CORS for all origins (Perfect for connecting Render to GitHub Pages)
-app.use(cors({ origin: '*' }));
+// app.use(cors({ origin: '*' }));
+app.use(cors({
+  origin: ['https://ritik1109.github.io', 'http://localhost:3000', 'http://127.0.0.1:5500'],
+  methods: ['GET','POST','PUT','DELETE','OPTIONS'],
+  allowedHeaders: ['Content-Type','Authorization'],
+}));
 app.use(bodyParser.json());
 
 // ─── ASYNC HANDLER WRAPPER ─────────────────────────────────────────────────
@@ -453,7 +458,6 @@ app.get('/api/health', (req, res) => {
     uptime: process.uptime(),
   });
 });
-
 
 // ─── ROOT ROUTE ───────────────────────────────────────────────────────────  ← ADD THIS
 app.get('/', (req, res) => res.json({ message: '🔧 Appliance Service API is running' }));
