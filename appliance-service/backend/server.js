@@ -481,6 +481,6 @@ app.use((err, req, res, next) => {
 // Bind to 0.0.0.0 so Render can detect the open port
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`✅ Server running on port ${PORT}`);
-  console.log(`🔐 Admin: username=admin, password=Admin@1234`);
+  console.log('🔐 Admin login: username=admin');
   console.log(`🩺 Health: http://localhost:${PORT}/api/health`);
 });
