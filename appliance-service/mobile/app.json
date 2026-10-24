@@ -1,0 +1,27 @@
+{
+  "expo": {
+    "name": "RR Appliance Service",
+    "slug": "rr-appliance-service",
+    "scheme": "rrappliance",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "dark",
+    "plugins": [
+      "expo-router",
+      "expo-secure-store"
+    ],
+    "ios": {
+      "bundleIdentifier": "com.rrconsultancy.applianceservice",
+      "supportsTablet": true
+    },
+    "android": {
+      "package": "com.rrconsultancy.applianceservice"
+    },
+    "web": {
+      "bundler": "metro"
+    },
+    "experiments": {
+      "typedRoutes": true
+    }
+  }
+}

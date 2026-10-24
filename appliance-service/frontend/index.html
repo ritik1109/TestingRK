@@ -667,7 +667,6 @@
       <input id="admin-password" type="password" placeholder="••••••••"/>
     </div>
     <button class="btn btn-primary" style="background:linear-gradient(135deg,#4f46e5,#818cf8);" onclick="adminLogin()">Login to Admin</button>
-    <!-- <p class="text-muted mt16" style="font-size:11px;">Default: admin / Admin@1234</p> -->
   </div>
 </div>
 
@@ -748,7 +747,7 @@ async function checkBackend() {
 //  STATE
 // ═══════════════════════════════════════════════════════════════════
 const state = {
-  token: localStorage.getItem('token') || null,
+  token: sessionStorage.getItem('token') || null,
   user: null,
   // adminToken: localStorage.getItem('adminToken') || null,
   adminToken: null, // Disable admin login for now
@@ -759,6 +758,9 @@ const state = {
   afterLogin: null,       // page to go after login
   bookingAppliance: null  // appliance to book after login
 };
+// Remove persistent tokens from the legacy storage format during the migration.
+localStorage.removeItem('token');
+localStorage.removeItem('user');
 
 // ═══════════════════════════════════════════════════════════════════
 //  APPLIANCES DATA
@@ -812,7 +814,7 @@ function renderAppliances(list) {
   grid.innerHTML = list.map(a => `
     <div class="appliance-card" onclick="selectAppliance('${a.id}')">
       <div class="icon">${a.icon}</div>
-      <div class="name">${a.name}</div>
+      <div class="name">${escapeHtml(a.name)}</div>
       ${a.tag ? `<div class="tag">${a.tag}</div>` : '<div style="height:16px;"></div>'}
     </div>
   `).join('');
@@ -933,18 +935,18 @@ function buildConfirmSummary() {
   if(!date){ toast('Please select a date','error'); nextStep(2); return; }
   document.getElementById('confirm-summary').innerHTML = `
     <div class="bc-header">
-      <div><h4>${a.icon} ${a.name} – ${state.selectedService}</h4><div class="bc-meta">${state.user?.name || ''}</div></div>
+      <div><h4>${a.icon} ${escapeHtml(a.name)} – ${escapeHtml(state.selectedService)}</h4><div class="bc-meta">${escapeHtml(state.user?.name || '')}</div></div>
       <div class="badge badge-pending">Pending</div>
     </div>
     <div class="bc-row">
-      <div class="bc-tag">📅 ${date}</div>
-      <div class="bc-tag">🕐 ${time}</div>
+      <div class="bc-tag">📅 ${escapeHtml(date)}</div>
+      <div class="bc-tag">🕐 ${escapeHtml(time)}</div>
     </div>
     <div class="bc-row">
-      <div class="bc-tag">📍 ${state.user?.location||'—'}</div>
-      <div class="bc-tag">📌 ${state.user?.pinAddress||'—'}</div>
+      <div class="bc-tag">📍 ${escapeHtml(state.user?.location||'—')}</div>
+      <div class="bc-tag">📌 ${escapeHtml(state.user?.pinAddress||'—')}</div>
     </div>
-    ${desc?`<p style="font-size:12px;color:var(--muted);margin-top:8px;">📝 ${desc}</p>`:''}
+    ${desc?`<p style="font-size:12px;color:var(--muted);margin-top:8px;">📝 ${escapeHtml(desc)}</p>`:''}
   `;
 }
 
@@ -1110,8 +1112,7 @@ async function submitProfile() {
 function setSession(token, user) {
   state.token = token;
   state.user = user;
-  localStorage.setItem('token', token);
-  localStorage.setItem('user', JSON.stringify(user));
+  sessionStorage.setItem('token', token);
   updateTopbar();
 }
 
@@ -1148,6 +1149,7 @@ function updateTopbar() {
 
 function logout() {
   state.token = null; state.user = null;
+  sessionStorage.removeItem('token');
   localStorage.removeItem('token'); localStorage.removeItem('user');
   updateTopbar();
   showPage('home');
@@ -1174,22 +1176,22 @@ async function loadBookings() {
       <div class="booking-card">
         <div class="bc-header">
           <div>
-            <h4>${applianceIcon(b.appliance)} ${b.appliance}</h4>
-            <div class="bc-meta">${b.serviceType}</div>
+            <h4>${applianceIcon(b.appliance)} ${escapeHtml(b.appliance)}</h4>
+            <div class="bc-meta">${escapeHtml(b.serviceType)}</div>
           </div>
-          <div class="badge badge-${b.status}">${b.status}</div>
+          <div class="badge badge-${escapeHtml(b.status)}">${escapeHtml(b.status)}</div>
         </div>
         <div class="bc-row">
-          <div class="bc-tag">📅 ${b.preferredDate}</div>
-          <div class="bc-tag">🕐 ${b.preferredTime}</div>
+          <div class="bc-tag">📅 ${escapeHtml(b.preferredDate)}</div>
+          <div class="bc-tag">🕐 ${escapeHtml(b.preferredTime)}</div>
         </div>
         <div class="bc-row">
-          <div class="bc-tag">📍 ${b.userLocation}</div>
+          <div class="bc-tag">📍 ${escapeHtml(b.userLocation)}</div>
         </div>
         <p style="font-size:11px;color:var(--muted);margin-top:6px;">Booked on ${fmtDate(b.createdAt)}</p>
       </div>
     `).join('');
-  } catch(e){ el.innerHTML=`<p class="text-muted text-center" style="padding:32px;">${e.message}</p>`; }
+  } catch(e){ el.innerHTML=`<p class="text-muted text-center" style="padding:32px;">${escapeHtml(e.message)}</p>`; }
 }
 
 // ═══════════════════════════════════════════════════════════════════
@@ -1209,34 +1211,34 @@ async function loadProfile() {
     const pending = bs.filter(b=>b.status==='pending').length;
     el.innerHTML = `
       <div class="profile-hero">
-        <div class="profile-avatar">${u.name[0].toUpperCase()}</div>
-        <h2>${u.name}</h2>
-        <p>+91 ${u.phone}</p>
+        <div class="profile-avatar">${escapeHtml((u.name || 'U')[0].toUpperCase())}</div>
+        <h2>${escapeHtml(u.name)}</h2>
+        <p>+91 ${escapeHtml(u.phone)}</p>
       </div>
       <div class="profile-stats">
         <div class="stat-box"><div class="num">${bs.length}</div><div class="lbl">Total</div></div>
         <div class="stat-box"><div class="num">${confirmed}</div><div class="lbl">Confirmed</div></div>
         <div class="stat-box"><div class="num">${pending}</div><div class="lbl">Pending</div></div>
       </div>
-      <div class="info-row"><div class="ir-icon">👤</div><div class="ir-text"><div class="ir-label">Full Name</div><div class="ir-val">${u.name}</div></div></div>
-      <div class="info-row"><div class="ir-icon">📱</div><div class="ir-text"><div class="ir-label">Phone</div><div class="ir-val">+91 ${u.phone}</div></div></div>
-      <div class="info-row"><div class="ir-icon">📍</div><div class="ir-text"><div class="ir-label">City / Location</div><div class="ir-val">${u.location||'Not set'}</div></div></div>
-      <div class="info-row"><div class="ir-icon">🏠</div><div class="ir-text"><div class="ir-label">Address</div><div class="ir-val">${u.pinAddress||'Not set'}</div></div></div>
+      <div class="info-row"><div class="ir-icon">👤</div><div class="ir-text"><div class="ir-label">Full Name</div><div class="ir-val">${escapeHtml(u.name)}</div></div></div>
+      <div class="info-row"><div class="ir-icon">📱</div><div class="ir-text"><div class="ir-label">Phone</div><div class="ir-val">+91 ${escapeHtml(u.phone)}</div></div></div>
+      <div class="info-row"><div class="ir-icon">📍</div><div class="ir-text"><div class="ir-label">City / Location</div><div class="ir-val">${escapeHtml(u.location||'Not set')}</div></div></div>
+      <div class="info-row"><div class="ir-icon">🏠</div><div class="ir-text"><div class="ir-label">Address</div><div class="ir-val">${escapeHtml(u.pinAddress||'Not set')}</div></div></div>
       <div class="info-row"><div class="ir-icon">📅</div><div class="ir-text"><div class="ir-label">Member Since</div><div class="ir-val">${fmtDate(u.createdAt)}</div></div></div>
       <div style="padding:20px 20px 0;">
         <div class="section-label" style="padding:0 0 12px;">Booking History</div>
         ${bs.length ? bs.map(b=>`
           <div class="booking-card" style="margin-bottom:10px;">
             <div class="bc-header">
-              <div><h4>${applianceIcon(b.appliance)} ${b.appliance} – ${b.serviceType}</h4><div class="bc-meta">${b.preferredDate} | ${b.preferredTime}</div></div>
-              <div class="badge badge-${b.status}">${b.status}</div>
+              <div><h4>${applianceIcon(b.appliance)} ${escapeHtml(b.appliance)} – ${escapeHtml(b.serviceType)}</h4><div class="bc-meta">${escapeHtml(b.preferredDate)} | ${escapeHtml(b.preferredTime)}</div></div>
+              <div class="badge badge-${escapeHtml(b.status)}">${escapeHtml(b.status)}</div>
             </div>
           </div>
         `).join('') : '<p class="text-muted">No bookings yet</p>'}
       </div>
       <button class="logout-btn" onclick="logout()">🚪 Logout</button>
     `;
-  } catch(e){ el.innerHTML=`<p class="text-muted text-center" style="padding:32px;">${e.message}</p>`; }
+  } catch(e){ el.innerHTML=`<p class="text-muted text-center" style="padding:32px;">${escapeHtml(e.message)}</p>`; }
 }
 
 // ═══════════════════════════════════════════════════════════════════
@@ -1292,9 +1294,9 @@ async function loadAdminData(tab) {
         <div class="admin-booking-card">
           <div class="ab-top">
             <div>
-              <h4>👤 ${u.name}</h4>
-              <div class="ab-info">📱 +91 ${u.phone}</div>
-              <div class="ab-info">📍 ${u.location||'—'} | ${u.pinAddress||'—'}</div>
+              <h4>👤 ${escapeHtml(u.name)}</h4>
+              <div class="ab-info">📱 +91 ${escapeHtml(u.phone)}</div>
+              <div class="ab-info">📍 ${escapeHtml(u.location||'—')} | ${escapeHtml(u.pinAddress||'—')}</div>
               <div class="ab-info" style="font-size:11px;color:var(--muted);">Joined ${fmtDate(u.createdAt)}</div>
             </div>
           </div>
@@ -1306,16 +1308,16 @@ async function loadAdminData(tab) {
       const bookings = d.bookings;
       if(!bookings.length){ el.innerHTML=`<div class="empty-state"><div class="ei">📋</div><h3>No bookings</h3></div>`; return; }
       el.innerHTML = bookings.map(b=>`
-         <div class="admin-booking-card" id="ab-${b._id}">
+         <div class="admin-booking-card" id="ab-${escapeHtml(b._id)}">
           <div class="ab-top">
             <div>
-              <h4>${applianceIcon(b.appliance)} ${b.appliance} – ${b.serviceType}</h4>
-              <div class="ab-info">👤 ${b.userName} | 📱 +91 ${b.userPhone}</div>
-              <div class="ab-info">📍 ${b.userLocation} | ${b.userPinAddress}</div>
-              <div class="ab-info">📅 ${b.preferredDate} | 🕐 ${b.preferredTime}</div>
-              ${b.description?`<div class="ab-info">📝 ${b.description}</div>`:''}
+              <h4>${applianceIcon(b.appliance)} ${escapeHtml(b.appliance)} – ${escapeHtml(b.serviceType)}</h4>
+              <div class="ab-info">👤 ${escapeHtml(b.userName)} | 📱 +91 ${escapeHtml(b.userPhone)}</div>
+              <div class="ab-info">📍 ${escapeHtml(b.userLocation)} | ${escapeHtml(b.userPinAddress)}</div>
+              <div class="ab-info">📅 ${escapeHtml(b.preferredDate)} | 🕐 ${escapeHtml(b.preferredTime)}</div>
+              ${b.description?`<div class="ab-info">📝 ${escapeHtml(b.description)}</div>`:''}
             </div>
-            <div class="badge badge-${b.status}">${b.status}</div>
+            <div class="badge badge-${escapeHtml(b.status)}">${escapeHtml(b.status)}</div>
           </div>
           ${b.status==='pending'?`
             <div class="action-row">
@@ -1327,12 +1329,12 @@ async function loadAdminData(tab) {
               <button class="btn btn-sm" style="background:#0a1a2e;color:var(--info);border:1px solid var(--info);" onclick="updateBooking('${b._id}','completed')">✓ Mark Complete</button>
             </div>
           `:''}
-          <p style="font-size:10px;color:var(--muted);margin-top:8px;">ID: ${b._id.toString().slice(0,8)}... | ${fmtDate(b.createdAt)}</p>
+          <p style="font-size:10px;color:var(--muted);margin-top:8px;">ID: ${escapeHtml(b._id.toString().slice(0,8))}... | ${fmtDate(b.createdAt)}</p>
 
         </div>
       `).join('');
     }
-  } catch(e){ el.innerHTML=`<p class="text-muted text-center" style="padding:32px;">${e.message}</p>`; }
+  } catch(e){ el.innerHTML=`<p class="text-muted text-center" style="padding:32px;">${escapeHtml(e.message)}</p>`; }
 }
 
 async function updateBooking(id, status) {
@@ -1402,6 +1404,13 @@ function fmtDate(s) {
   return new Date(s).toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric'});
 }
 
+// Escape all server-provided strings before inserting them into legacy HTML templates.
+function escapeHtml(value) {
+  return String(value ?? '').replace(/[&<>"']/g, char => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+  })[char]);
+}
+
 function applianceIcon(name) {
   const a = appliances.find(x=>x.name===name);
   return a ? a.icon : '🔧';
@@ -1420,6 +1429,7 @@ function toast(msg, type='') {
 async function validateSession() {
   if (!state.token) {
     state.user = null;
+    localStorage.removeItem('token');
     localStorage.removeItem('user');
     updateTopbar();
     return;
@@ -1432,7 +1442,7 @@ async function validateSession() {
       // Token is invalid/expired — clear stale session
       state.token = null;
       state.user = null;
-      localStorage.removeItem('token');
+      sessionStorage.removeItem('token');
       localStorage.removeItem('user');
       updateTopbar();
       return;
@@ -1441,7 +1451,6 @@ async function validateSession() {
     const data = await r.json();
     state.user = data.user || null;
     if (state.user) {
-      localStorage.setItem('user', JSON.stringify(state.user));
     }
     updateTopbar();
   } catch(e) {
