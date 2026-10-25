@@ -10,6 +10,7 @@ export default function ProfileScreen() {
   const { user, updateUser, signOut } = useApp();
   const [name, setName] = useState(user?.name ?? '');
   const [location, setLocation] = useState(user?.location ?? '');
+  const [pinCode, setPinCode] = useState(user?.pinCode ?? '');
   const [pinAddress, setPinAddress] = useState(user?.pinAddress ?? '');
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
@@ -17,19 +18,24 @@ export default function ProfileScreen() {
   useEffect(() => {
     setName(user?.name ?? '');
     setLocation(user?.location ?? '');
+    setPinCode(user?.pinCode ?? '');
     setPinAddress(user?.pinAddress ?? '');
   }, [user]);
 
   /** Save only editable profile fields; the backend derives the account from the token. */
   async function saveProfile() {
+    if (pinCode && !/^[1-9]\d{5}$/.test(pinCode.trim())) {
+      setMessage('Enter a valid 6-digit PIN code.');
+      return;
+    }
     setBusy(true);
     setMessage('');
     try {
       const response = await apiRequest<{ user: User }>('/user/profile', {
         method: 'PUT',
-        body: { name, location, pinAddress },
+        body: { name, location, pinCode, pinAddress },
       });
-      updateUser(response.user);
+      await updateUser(response.user);
       setMessage('Profile saved.');
     } catch (error) {
       setMessage(error instanceof Error ? error.message : 'Could not save your profile.');
@@ -58,8 +64,9 @@ export default function ProfileScreen() {
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
         <Heading subtitle={`Phone: +91 ${user.phone}`}>Your profile</Heading>
         <Field accessibilityLabel="Full name" onChangeText={setName} placeholder="Full name" value={name} />
-        <Field accessibilityLabel="City or location" onChangeText={setLocation} placeholder="City or location" value={location} />
-        <Field accessibilityLabel="Service address" multiline onChangeText={setPinAddress} placeholder="Service address" value={pinAddress} />
+        <Field accessibilityLabel="Local area or place name" onChangeText={setLocation} placeholder="Local area / place name" value={location} />
+        <Field accessibilityLabel="Six-digit postal PIN code" keyboardType="number-pad" maxLength={6} onChangeText={setPinCode} placeholder="6-digit PIN code" value={pinCode} />
+        <Field accessibilityLabel="House, street, or landmark" multiline onChangeText={setPinAddress} placeholder="House, street, or landmark (optional)" value={pinAddress} />
         {message ? <Notice error={message.startsWith('Could not')}>{message}</Notice> : null}
         <ActionButton title="Save profile" loading={busy} onPress={saveProfile} />
         <ActionButton title="Sign out" onPress={logOut} secondary />

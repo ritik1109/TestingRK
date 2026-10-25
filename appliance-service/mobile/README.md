@@ -37,10 +37,17 @@ are separate signed store artifacts from the web export.
 
 ## Session storage
 
-Android and iOS store the access token using the platform secure-store plugin.
-The web client uses tab-scoped `sessionStorage`; browser JavaScript can still
-read that token, so a production web deployment should move to a backend
-HttpOnly, Secure, SameSite cookie session before handling real customer data.
+Android and iOS store access tokens, rotating refresh tokens, and a cached
+profile using the platform secure-store plugin. The customer session remains
+signed in across app restarts and refreshes access credentials automatically;
+it ends when the customer signs out or reinstalls the app. A local app-sandbox
+marker detects fresh installs and removes secure credentials that iOS Keychain
+could otherwise preserve across reinstall.
+The backend keeps only hashed refresh credentials and limits each account to
+ten active device sessions. The web client uses tab-scoped `sessionStorage`;
+browser JavaScript can still read those tokens, so a production web deployment
+should move to a backend HttpOnly, Secure, SameSite cookie session before
+handling real customer data.
 
 ## Platform and release identity
 
@@ -49,7 +56,9 @@ identifiers. Confirm they are owned and unused before release; changing either
 after publishing creates a different store app. Android and iOS builds are
 separate from the web export, even though screens and business logic are shared.
 
-Customer flows implemented here: phone OTP sign-in, first-time profile
-completion, appliance/service selection, booking requests, booking status
-history, profile editing, and sign-out. Admin management remains on the existing
-web admin screen and is not exposed in the customer app.
+Customer flows implemented here: sign-up by default with a separate phone OTP
+sign-in option for existing accounts, first-time profile completion,
+appliance/service selection, calendar-based booking requests with five
+10 AM–7 PM appointment windows and same-day availability filtering, booking
+status history, profile editing, and sign-out. Admin management remains on the
+existing web admin screen and is not exposed in the customer app.

@@ -1,13 +1,22 @@
 import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import { apiRequest, ApiError, type User } from '@/lib/api';
-import { clearToken, readToken, writeToken } from '@/lib/storage';
+import {
+  clearToken,
+  clearSessionAfterReinstall,
+  readCachedUser,
+  readRefreshToken,
+  readToken,
+  writeCachedUser,
+  writeRefreshToken,
+  writeToken,
+} from '@/lib/storage';
 
 interface AppContextValue {
   user: User | null;
   token: string | null;
   ready: boolean;
-  signIn: (token: string, user: User) => Promise<void>;
-  updateUser: (user: User) => void;
+  signIn: (token: string, refreshToken: string, user: User) => Promise<void>;
+  updateUser: (user: User) => Promise<void>;
   signOut: () => Promise<void>;
 }
 
@@ -24,6 +33,13 @@ export function AppProvider({ children }: React.PropsWithChildren) {
     // Restore only from secure storage and validate the token before showing the account session.
     async function restore() {
       try {
+        await clearSessionAfterReinstall();
+      } catch (error) {
+        console.error('Could not check whether this app installation is new:', error);
+        if (active) setReady(true);
+        return;
+      }
+      try {
         const savedToken = await readToken();
         if (!savedToken) return;
         const response = await apiRequest<{ user: User }>('/user/profile', { token: savedToken });
@@ -35,8 +51,14 @@ export function AppProvider({ children }: React.PropsWithChildren) {
         if (error instanceof ApiError && error.status === 401) {
           await clearToken();
         } else {
-          const savedToken = await readToken();
-          if (active) setToken(savedToken);
+          const [savedToken, cachedUser] = await Promise.all([
+            readToken(),
+            readCachedUser<User>(),
+          ]);
+          if (active) {
+            setToken(savedToken);
+            setUser(savedToken ? cachedUser : null);
+          }
         }
       } finally {
         if (active) setReady(true);
@@ -51,20 +73,38 @@ export function AppProvider({ children }: React.PropsWithChildren) {
     token,
     ready,
     /** Store verified credentials before updating the in-memory session. */
-    async signIn(nextToken, nextUser) {
-      await writeToken(nextToken);
+    async signIn(nextToken, refreshToken, nextUser) {
+      await Promise.all([
+        writeToken(nextToken),
+        writeRefreshToken(refreshToken),
+        writeCachedUser(nextUser),
+      ]);
       setToken(nextToken);
       setUser(nextUser);
     },
     /** Replace only the in-memory profile after the backend confirms an update. */
-    updateUser(nextUser) {
+    async updateUser(nextUser) {
+      await writeCachedUser(nextUser);
       setUser(nextUser);
     },
-    /** Clear platform token storage before dropping the current session. */
+    /** Revoke the server session when possible and always clear local credentials. */
     async signOut() {
-      await clearToken();
-      setToken(null);
-      setUser(null);
+      const refreshToken = await readRefreshToken();
+      try {
+        if (refreshToken) {
+          await apiRequest('/auth/logout', {
+            method: 'POST',
+            body: { refreshToken },
+            skipRefresh: true,
+          });
+        }
+      } catch (error) {
+        console.warn('Could not revoke the server session during logout:', error);
+      } finally {
+        await clearToken();
+        setToken(null);
+        setUser(null);
+      }
     },
   }), [user, token, ready]);
 

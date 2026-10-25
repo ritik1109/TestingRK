@@ -11,7 +11,14 @@ const axios = require('axios');
 const mongoose = require('mongoose');
 const crypto = require('crypto');
 const bcrypt = require('bcryptjs');
-const { isValidBookingDate, normalizePhone, validText } = require('./lib/validation');
+const {
+  isValidBookingDate,
+  isValidBookingTime,
+  isValidPinCode,
+  getAuthIntentError,
+  normalizePhone,
+  validText,
+} = require('./lib/validation');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -130,7 +137,9 @@ const UserSchema = new mongoose.Schema({
   name: { type: String, default: 'User' },
   phone: { type: String, required: true, unique: true },
   location: { type: String, default: '' },
+  pinCode: { type: String, default: '' },
   pinAddress: { type: String, default: '' },
+  profileComplete: { type: Boolean, default: false },
   createdAt: { type: Date, default: Date.now },
 });
 const User = mongoose.model('User', UserSchema);
@@ -140,6 +149,7 @@ const BookingSchema = new mongoose.Schema({
   userName: String,
   userPhone: String,
   userLocation: String,
+  userPinCode: String,
   userPinAddress: String,
   appliance: String,
   serviceType: String,
@@ -165,6 +175,15 @@ const OtpSchema = new mongoose.Schema({
 });
 const Otp = mongoose.model('Otp', OtpSchema);
 
+const RefreshSessionSchema = new mongoose.Schema({
+  tokenHash: { type: String, required: true, unique: true },
+  userId: { type: String, required: true },
+  phone: { type: String, required: true },
+  createdAt: { type: Date, default: Date.now },
+  lastUsedAt: { type: Date, default: Date.now },
+});
+const RefreshSession = mongoose.model('RefreshSession', RefreshSessionSchema);
+
 // ─── HELPERS ───────────────────────────────────────────────────────────────
 // Use a cryptographically secure random generator for six-digit verification codes.
 function generateOTP() {
@@ -174,6 +193,40 @@ function generateOTP() {
 // Store a keyed digest so a database read does not reveal live OTP values.
 function hashOTP(phone, otp) {
   return crypto.createHmac('sha256', JWT_SECRET).update(`${phone}:${otp}`).digest('hex');
+}
+
+/** Hash random refresh credentials before persisting them in MongoDB. */
+function hashRefreshToken(token) {
+  return crypto.createHash('sha256').update(token).digest('hex');
+}
+
+/** Issue a new long-lived, single-use refresh credential for a verified customer. */
+async function createRefreshSession(user) {
+  const refreshToken = crypto.randomBytes(32).toString('base64url');
+  await RefreshSession.create({
+    tokenHash: hashRefreshToken(refreshToken),
+    userId: user._id.toString(),
+    phone: user.phone,
+  });
+
+  const sessions = await RefreshSession.find({ userId: user._id.toString() })
+    .sort({ lastUsedAt: -1 })
+    .select('_id')
+    .skip(10)
+    .lean();
+  if (sessions.length) {
+    await RefreshSession.deleteMany({ _id: { $in: sessions.map((session) => session._id) } });
+  }
+  return refreshToken;
+}
+
+/** Create a short-lived customer access token; the mobile client refreshes it silently. */
+function createCustomerAccessToken(user) {
+  return jwt.sign(
+    { id: user._id, phone: user.phone, role: 'user' },
+    JWT_SECRET,
+    { expiresIn: '7d', algorithm: 'HS256' }
+  );
 }
 
 // Compare OTP digests without leaking the matching prefix through timing.
@@ -324,17 +377,21 @@ app.post(
   '/api/auth/verify-otp',
   rateLimit({ windowMs: 15 * 60 * 1000, max: 10, key: (req) => `${req.ip}:${normalizePhone(req.body?.phone)}` }),
   asyncHandler(async (req, res) => {
-    const { phone, otp, name, location, pinAddress } = req.body;
+    const { phone, otp, name, location, pinCode, pinAddress, intent } = req.body;
     const normalizedPhone = normalizePhone(phone);
     const normalizedOtp = typeof otp === 'string' ? otp.trim() : '';
 
     if (!normalizedPhone || !/^\d{6}$/.test(normalizedOtp)) {
       return res.status(400).json({ error: 'A valid phone number and six-digit OTP are required.' });
     }
+    if (intent != null && !['signup', 'signin'].includes(intent)) {
+      return res.status(400).json({ error: 'Choose sign up or sign in to continue.' });
+    }
     if ((name != null && (typeof name !== 'string' || name.length > 100))
       || (location != null && (typeof location !== 'string' || location.length > 120))
+      || (pinCode != null && !isValidPinCode(pinCode))
       || (pinAddress != null && (typeof pinAddress !== 'string' || pinAddress.length > 300))) {
-      return res.status(400).json({ error: 'Profile fields exceed the allowed length.' });
+      return res.status(400).json({ error: 'Enter a valid six-digit PIN code and keep profile fields within the allowed lengths.' });
     }
 
     const stored = await Otp.findOne({ phone: normalizedPhone });
@@ -353,6 +410,12 @@ app.post(
       return res.status(400).json({ error: 'Invalid OTP' });
     }
 
+    const user = await User.findOne({ phone: normalizedPhone });
+    const intentError = getAuthIntentError(intent, Boolean(user));
+    if (intentError) {
+      return res.status(intent === 'signup' ? 409 : 404).json({ error: intentError });
+    }
+
     const consumedOtp = await Otp.findOneAndDelete({
       phone: normalizedPhone,
       otpHash: stored.otpHash,
@@ -361,31 +424,60 @@ app.post(
     });
     if (!consumedOtp) return res.status(400).json({ error: 'OTP has expired or already been used.' });
 
-    let user = await User.findOne({ phone: normalizedPhone });
-    const isNewUser = !user;
+    const isNewUser = !user || !user.profileComplete;
     if (!user) {
       user = await User.create({
         phone: normalizedPhone,
         name: name || 'User',
         location: location || '',
+        pinCode: pinCode || '',
         pinAddress: pinAddress || '',
       });
     } else {
       if (name) user.name = name;
       if (location) user.location = location;
+      if (pinCode) user.pinCode = pinCode;
       if (pinAddress) user.pinAddress = pinAddress;
       await user.save();
     }
 
-    const token = jwt.sign(
-      { id: user._id, phone: normalizedPhone, role: 'user' },
-      JWT_SECRET,
-      { expiresIn: '7d', algorithm: 'HS256' }
-    );
+    const token = createCustomerAccessToken(user);
+    const refreshToken = await createRefreshSession(user);
 
-    res.json({ success: true, token, user, isNewUser });
+    res.json({ success: true, token, refreshToken, user, isNewUser });
   })
 );
+
+// POST /api/auth/refresh
+app.post('/api/auth/refresh', rateLimit({ windowMs: 15 * 60 * 1000, max: 30 }), asyncHandler(async (req, res) => {
+  const { refreshToken } = req.body;
+  if (typeof refreshToken !== 'string' || refreshToken.length < 40 || refreshToken.length > 100) {
+    return res.status(400).json({ error: 'A valid refresh token is required.' });
+  }
+
+  const session = await RefreshSession.findOneAndDelete({ tokenHash: hashRefreshToken(refreshToken) });
+  if (!session) return res.status(401).json({ error: 'Session is invalid. Sign in again.' });
+
+  const user = await User.findById(session.userId);
+  if (!user || user.phone !== session.phone) {
+    return res.status(401).json({ error: 'Session is invalid. Sign in again.' });
+  }
+
+  const nextRefreshToken = await createRefreshSession(user);
+  res.json({
+    accessToken: createCustomerAccessToken(user),
+    refreshToken: nextRefreshToken,
+  });
+}));
+
+// POST /api/auth/logout
+app.post('/api/auth/logout', rateLimit({ windowMs: 15 * 60 * 1000, max: 30 }), asyncHandler(async (req, res) => {
+  const { refreshToken } = req.body;
+  if (typeof refreshToken === 'string' && refreshToken.length >= 40 && refreshToken.length <= 100) {
+    await RefreshSession.deleteOne({ tokenHash: hashRefreshToken(refreshToken) });
+  }
+  res.json({ success: true });
+}));
 
 // ─── USER ROUTES ───────────────────────────────────────────────────────────
 
@@ -406,13 +498,18 @@ app.put(
   '/api/user/profile',
   authMiddleware,
   asyncHandler(async (req, res) => {
-    const { name, location, pinAddress } = req.body;
-    if (!validText(name, 100) || !validText(location, 120) || !validText(pinAddress, 300)) {
-      return res.status(400).json({ error: 'Name, location, and address are required and must be within the allowed length.' });
+    const { name, location, pinCode, pinAddress } = req.body;
+    if (!validText(name, 100) || !validText(location, 120)
+      || (pinCode != null && !isValidPinCode(pinCode))
+      || (pinAddress != null && (typeof pinAddress !== 'string' || pinAddress.length > 300))) {
+      return res.status(400).json({ error: 'Enter a valid name and local area; PIN code must be six digits.' });
     }
+    const updates = { name: name.trim(), location: location.trim(), profileComplete: true };
+    if (pinCode != null) updates.pinCode = pinCode;
+    if (pinAddress != null) updates.pinAddress = pinAddress.trim();
     const user = await User.findOneAndUpdate(
       { phone: req.user.phone },
-      { $set: { name: name.trim(), location: location.trim(), pinAddress: pinAddress.trim() } },
+      { $set: updates },
       { new: true, runValidators: true }
     );
     if (!user) return res.status(404).json({ error: 'User not found' });
@@ -434,10 +531,16 @@ app.post(
       new Date(),
       process.env.BUSINESS_TIME_ZONE || 'Asia/Kolkata'
     );
+    const validTime = isValidBookingTime(
+      preferredTime,
+      preferredDate,
+      new Date(),
+      process.env.BUSINESS_TIME_ZONE || 'Asia/Kolkata'
+    );
     if (!validText(appliance, 80) || !validText(serviceType, 100) || !validDate
-      || !validText(preferredTime, 40) || (description != null && (typeof description !== 'string' || description.length > 1000))) {
+      || !validTime || (description != null && (typeof description !== 'string' || description.length > 1000))) {
       return res.status(400).json({
-        error: 'Provide a valid appliance, service type, future date, time, and a description under 1000 characters.',
+        error: 'Choose a valid appliance, service, today or a future date, and an available 10 AM to 7 PM time slot.',
       });
     }
 
@@ -450,6 +553,7 @@ app.post(
       userName: user.name,
       userPhone: user.phone,
       userLocation: user.location,
+      userPinCode: user.pinCode,
       userPinAddress: user.pinAddress,
       appliance: appliance.trim(),
       serviceType: serviceType.trim(),

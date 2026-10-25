@@ -31,8 +31,10 @@ npm start
 The current rate limiter is process-local. Before using multiple API replicas,
 replace it with a shared store such as Redis and configure proxy trust only for
 the known hosting proxy. The API also needs production monitoring, backup
-restore tests, token revocation/refresh, and audit events for admin changes
-before it should be treated as production-complete.
+restore tests, and audit events for admin changes before it should be treated
+as production-complete. Customer mobile sessions use rotating refresh tokens
+stored as hashes in MongoDB; sign-out revokes the current device session, and
+each account is limited to ten active sessions.
 
 The previously committed backend `.env` should be considered exposed. Keep the
 local file out of Git, rotate all values that were ever real, and do not reuse
