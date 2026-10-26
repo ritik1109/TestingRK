@@ -59,7 +59,9 @@ separate from the web export, even though screens and business logic are shared.
 Customer flows implemented here: sign-up by default with a separate phone OTP
 sign-in option for existing accounts, first-time profile completion,
 PIN-code verification with customer-entered locality and address,
-appliance/service selection, calendar-based booking requests with five
-10 AM–7 PM appointment windows and same-day availability filtering, booking
-status history, profile editing, and sign-out. Admin management remains on the
-existing web admin screen and is not exposed in the customer app.
+appliance/service selection on a single dashboard, calendar-based booking
+requests with five 10 AM–7 PM appointment windows and same-day availability
+filtering, a top-right profile avatar, a profile page with personal details and
+up to four recent bookings, one full booking-management page, separate
+profile-details editing, and sign-out. Admin management remains on the existing
+web admin screen and is not exposed in the customer app.

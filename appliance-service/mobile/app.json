@@ -15,7 +15,8 @@
       "supportsTablet": true
     },
     "android": {
-      "package": "com.rrconsultancy.applianceservice"
+      "package": "com.rrconsultancy.applianceservice",
+      "softwareKeyboardLayoutMode": "resize"
     },
     "web": {
       "bundler": "metro"

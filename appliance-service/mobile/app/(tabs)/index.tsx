@@ -1,7 +1,18 @@
-import { useEffect, useState } from 'react';
-import { Keyboard, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useEffect, useRef, useState } from 'react';
+import {
+  Animated,
+  Keyboard,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+  type ScrollViewInstance,
+  type TextInputFocusEvent,
+} from 'react-native';
 import { router } from 'expo-router';
 import { ActionButton, colors, commonStyles, Field, Heading, Notice, Page } from '@/components/ui';
+import { AnimeAvatar } from '@/components/AnimeAvatar';
 import { useApp } from '@/components/AppProvider';
 import { apiRequest } from '@/lib/api';
 import {
@@ -27,6 +38,14 @@ export default function HomeScreen() {
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
   const [now, setNow] = useState(() => new Date());
+  const [appointmentSectionY, setAppointmentSectionY] = useState<number | null>(null);
+  const [headerHeight, setHeaderHeight] = useState(58);
+  const [headerVisible, setHeaderVisible] = useState(true);
+  const [keyboardVisible, setKeyboardVisible] = useState(false);
+  const scrollOffset = useRef(0);
+  const hideHeaderTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const dashboardScroll = useRef<ScrollViewInstance>(null);
+  const headerTranslateY = useRef(new Animated.Value(0)).current;
   const [calendarMonth, setCalendarMonth] = useState(() => {
     const current = new Date();
     return new Date(current.getFullYear(), current.getMonth(), 1);
@@ -48,6 +67,56 @@ export default function HomeScreen() {
     const timer = setInterval(() => setNow(new Date()), 30_000);
     return () => clearInterval(timer);
   }, []);
+
+  useEffect(() => {
+    const show = Keyboard.addListener('keyboardDidShow', () => setKeyboardVisible(true));
+    const hide = Keyboard.addListener('keyboardDidHide', () => setKeyboardVisible(false));
+    return () => {
+      show.remove();
+      hide.remove();
+    };
+  }, []);
+
+  useEffect(() => {
+    Animated.timing(headerTranslateY, {
+      toValue: headerVisible ? 0 : -headerHeight,
+      duration: 180,
+      useNativeDriver: true,
+    }).start();
+  }, [headerHeight, headerTranslateY, headerVisible]);
+
+  useEffect(() => () => {
+    if (hideHeaderTimer.current) clearTimeout(hideHeaderTimer.current);
+  }, []);
+
+  useEffect(() => {
+    if (!serviceType || appointmentSectionY === null) return;
+    const frame = requestAnimationFrame(() => {
+      dashboardScroll.current?.scrollTo({ y: Math.max(appointmentSectionY - 12, 0), animated: true });
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [appointmentSectionY, serviceType]);
+
+  function onDashboardScroll(event: { nativeEvent: { contentOffset: { y: number } } }) {
+    scrollOffset.current = event.nativeEvent.contentOffset.y;
+    if (hideHeaderTimer.current) clearTimeout(hideHeaderTimer.current);
+    setHeaderVisible(true);
+    if (!keyboardVisible && scrollOffset.current > 80) {
+      hideHeaderTimer.current = setTimeout(() => setHeaderVisible(false), 750);
+    }
+  }
+
+  function keepFocusedFieldVisible(event: TextInputFocusEvent) {
+    setHeaderVisible(true);
+    if (hideHeaderTimer.current) clearTimeout(hideHeaderTimer.current);
+    requestAnimationFrame(() => {
+      dashboardScroll.current?.scrollResponderScrollNativeHandleToKeyboard(
+        event.nativeEvent.target,
+        140,
+        true,
+      );
+    });
+  }
 
   useEffect(() => {
     if (isValidDateKey(preferredDate) && preferredDate < todayKey) {
@@ -102,10 +171,49 @@ export default function HomeScreen() {
 
   return (
     <Page style={styles.page}>
-      <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-        <Heading subtitle={user ? `Welcome, ${user.name}` : 'Book a trusted home appliance service.'}>
-          Home service, made simple
+      <Animated.View
+        onLayout={(event) => setHeaderHeight(event.nativeEvent.layout.height)}
+        style={[styles.fixedHeader, { transform: [{ translateY: headerTranslateY }] }]}
+      >
+        <View style={styles.dashboardHeader}>
+          <View style={styles.brand}>
+            <View style={styles.logoMark}>
+              <Text style={styles.logoR}>R</Text>
+              <Text style={styles.logoRAccent}>R</Text>
+            </View>
+            <Text style={styles.brandName}>RR SERVICE</Text>
+          </View>
+          {user ? (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Open your profile"
+              onPress={() => router.push('/(tabs)/profile')}
+              style={styles.avatarButton}
+            >
+              <AnimeAvatar name={user.name || user.phone} size={44} />
+            </Pressable>
+          ) : null}
+        </View>
+      </Animated.View>
+      <ScrollView
+        ref={dashboardScroll}
+        contentContainerStyle={styles.content}
+        keyboardShouldPersistTaps="handled"
+        onScroll={onDashboardScroll}
+        scrollEventThrottle={16}
+      >
+        <View style={{ height: headerHeight }} />
+        <Heading subtitle={user ? `Welcome back, ${user.name}` : 'Reliable care for every appliance at home.'}>
+          Home service,{'\n'}made simple.
         </Heading>
+        <View style={styles.heroCard}>
+          <View style={styles.heroCopy}>
+            <Text style={styles.heroEyebrow}>CARE FOR YOUR HOME</Text>
+            <Text style={styles.heroTitle}>Repairs made easy.</Text>
+            <Text style={styles.heroSubtitle}>Choose a service and find a time that works for you.</Text>
+          </View>
+          <Text style={styles.heroIcon}>🛠️</Text>
+        </View>
         {!user ? (
           <View style={commonStyles.card}>
             <Text style={commonStyles.muted}>Sign in with your phone to request service and track bookings.</Text>
@@ -113,7 +221,34 @@ export default function HomeScreen() {
           </View>
         ) : null}
 
-        <Text style={commonStyles.sectionTitle}>1. Choose an appliance</Text>
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionTitle}>Popular services</Text>
+          <Text style={styles.sectionHint}>Quick start</Text>
+        </View>
+        <View style={styles.popularGrid}>
+          {[
+            { appliance: 'ac', title: 'AC service', detail: 'Clean & cool', icon: '❄️', service: 'Service/Clean' },
+            { appliance: 'washing', title: 'Washer repair', detail: 'Back in action', icon: '🫧', service: 'Repair' },
+            { appliance: 'fridge', title: 'Fridge repair', detail: 'Keep it fresh', icon: '🧊', service: 'Repair' },
+            { appliance: 'ro', title: 'RO service', detail: 'Fresh water', icon: '💧', service: 'Service/Clean' },
+          ].map((item) => (
+            <Pressable
+              key={item.appliance}
+              accessibilityRole="button"
+              onPress={() => { setApplianceId(item.appliance); setServiceType(item.service); }}
+              style={styles.popularCard}
+            >
+              <View style={styles.popularIcon}><Text style={styles.popularEmoji}>{item.icon}</Text></View>
+              <Text style={styles.popularTitle}>{item.title}</Text>
+              <Text style={styles.popularDetail}>{item.detail}</Text>
+            </Pressable>
+          ))}
+        </View>
+
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionTitle}>All appliances</Text>
+          <Text style={styles.sectionHint}>12 categories</Text>
+        </View>
         <View style={styles.grid}>
           {appliances.map((item) => (
             <Pressable
@@ -145,11 +280,13 @@ export default function HomeScreen() {
                 </Pressable>
               ))}
             </View>
+            <View onLayout={(event) => setAppointmentSectionY(event.nativeEvent.layout.y)}>
             <Text style={commonStyles.sectionTitle}>3. Preferred appointment</Text>
             <Field
               accessibilityLabel="Preferred date in year-month-day format"
               autoCapitalize="none"
-              onFocus={() => {
+              onFocus={(event) => {
+                keepFocusedFieldVisible(event);
                 setCalendarVisible(true);
                 setTimeSlotsVisible(false);
               }}
@@ -226,7 +363,8 @@ export default function HomeScreen() {
             <Field
               accessibilityLabel="Preferred time slot between 10 AM and 7 PM"
               editable={validSelectedDate}
-              onFocus={() => {
+              onFocus={(event) => {
+                keepFocusedFieldVisible(event);
                 setTimeSlotsVisible(true);
                 setCalendarVisible(false);
               }}
@@ -274,6 +412,7 @@ export default function HomeScreen() {
             <Field
               accessibilityLabel="Describe the issue (optional)"
               multiline
+              onFocus={keepFocusedFieldVisible}
               onChangeText={setDescription}
               placeholder="Describe the issue (optional)"
               value={description}
@@ -284,6 +423,7 @@ export default function HomeScreen() {
               loading={busy}
               onPress={user ? submitBooking : () => router.push('/login')}
             />
+            </View>
           </>
         ) : null}
       </ScrollView>
@@ -293,7 +433,30 @@ export default function HomeScreen() {
 
 const styles = StyleSheet.create({
   page: { padding: 0 },
-  content: { gap: 16, padding: 20, paddingBottom: 36 },
+  content: { gap: 20, paddingHorizontal: 20, paddingBottom: 40 },
+  fixedHeader: { backgroundColor: colors.background, elevation: 8, left: 0, paddingHorizontal: 20, paddingVertical: 10, position: 'absolute', right: 0, top: 0, zIndex: 5 },
+  dashboardHeader: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between', marginBottom: 2 },
+  brand: { alignItems: 'center', flexDirection: 'row', gap: 9 },
+  logoMark: { alignItems: 'center', backgroundColor: '#171717', borderColor: colors.border, borderRadius: 10, borderWidth: 1, flexDirection: 'row', height: 38, justifyContent: 'center', width: 48 },
+  logoR: { color: colors.text, fontSize: 23, fontWeight: '800' },
+  logoRAccent: { color: colors.accent, fontSize: 23, fontWeight: '800', marginLeft: -2 },
+  brandName: { color: colors.text, fontSize: 12, fontWeight: '800', letterSpacing: 1.5 },
+  avatarButton: { borderRadius: 24, padding: 2 },
+  heroCard: { alignItems: 'center', backgroundColor: '#25160F', borderColor: '#57301F', borderRadius: 20, borderWidth: 1, flexDirection: 'row', justifyContent: 'space-between', minHeight: 142, overflow: 'hidden', padding: 20 },
+  heroCopy: { flex: 1, gap: 8 },
+  heroEyebrow: { color: '#FFB18D', fontSize: 10, fontWeight: '800', letterSpacing: 1.7 },
+  heroTitle: { color: colors.text, fontSize: 22, fontWeight: '800' },
+  heroSubtitle: { color: '#D2B6A8', fontSize: 13, lineHeight: 19, maxWidth: 230 },
+  heroIcon: { fontSize: 46, marginLeft: 10 },
+  sectionHeader: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between', marginBottom: -8 },
+  sectionTitle: { color: colors.text, fontSize: 19, fontWeight: '800' },
+  sectionHint: { color: colors.muted, fontSize: 12, fontWeight: '600' },
+  popularGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
+  popularCard: { backgroundColor: colors.card, borderColor: colors.border, borderRadius: 16, borderWidth: 1, flexBasis: '48%', flexGrow: 1, gap: 5, minHeight: 126, padding: 13 },
+  popularIcon: { alignItems: 'center', backgroundColor: '#30231E', borderRadius: 12, height: 40, justifyContent: 'center', marginBottom: 4, width: 40 },
+  popularEmoji: { fontSize: 22 },
+  popularTitle: { color: colors.text, fontSize: 14, fontWeight: '700' },
+  popularDetail: { color: colors.muted, fontSize: 12 },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
   appliance: {
     alignItems: 'center',

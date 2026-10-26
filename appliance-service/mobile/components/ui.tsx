@@ -9,6 +9,8 @@ import {
   type TextInputProps,
   type ViewProps,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export const colors = {
   background: '#0D0D0D',
@@ -24,7 +26,21 @@ export const colors = {
 
 /** Provide a scroll-safe screen base using the app's common background. */
 export function Page({ children, style, ...props }: ViewProps) {
-  return <View {...props} style={[styles.page, style]}>{children}</View>;
+  const insets = useSafeAreaInsets();
+  return (
+    <SafeAreaView edges={['top', 'right', 'left']} style={styles.safePage}>
+      <View
+        {...props}
+        style={[
+          styles.pageContent,
+          style,
+          { paddingBottom: Math.max(insets.bottom + 12, 28) },
+        ]}
+      >
+        {children}
+      </View>
+    </SafeAreaView>
+  );
 }
 
 /** Render a consistent screen title and optional supporting text. */
@@ -101,7 +117,8 @@ export const commonStyles = StyleSheet.create({
 });
 
 const styles = StyleSheet.create({
-  page: { backgroundColor: colors.background, flex: 1, gap: 16, padding: 20 },
+  safePage: { backgroundColor: colors.background, flex: 1 },
+  pageContent: { backgroundColor: colors.background, flex: 1, gap: 16, padding: 20 },
   heading: { gap: 6, marginBottom: 4 },
   title: { color: colors.text, fontSize: 28, fontWeight: '800' },
   subtitle: { color: colors.muted, fontSize: 15, lineHeight: 21 },

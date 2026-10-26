@@ -2,16 +2,19 @@ import { Stack, router, useSegments } from 'expo-router';
 import { useEffect } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { AppProvider, useApp } from '@/components/AppProvider';
 import { colors } from '@/components/ui';
 
 /** Set up shared state, safe-area-aware navigation, and platform status styling. */
 export default function RootLayout() {
   return (
-    <AppProvider>
-      <StatusBar style="light" />
-      <RootNavigator />
-    </AppProvider>
+    <SafeAreaProvider>
+      <AppProvider>
+        <StatusBar style="light" />
+        <RootNavigator />
+      </AppProvider>
+    </SafeAreaProvider>
   );
 }
 
@@ -39,6 +42,7 @@ function RootNavigator() {
       }}
     >
       <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+      <Stack.Screen name="profile-details" options={{ title: 'Change details', headerBackTitle: 'Profile' }} />
       <Stack.Screen name="login" options={{ title: 'Sign in', headerShown: false }} />
     </Stack>
   );
