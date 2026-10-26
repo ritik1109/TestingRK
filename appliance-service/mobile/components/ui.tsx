@@ -20,10 +20,13 @@ const darkColors = {
   card: '#1E1E1E',
   border: '#2A2A2A',
   accent: '#FF6B35',
+  buttonText: '#171717',
   text: '#F0F0F0',
   muted: '#A0A0A0',
   success: '#22C55E',
   error: '#EF4444',
+  info: '#60A5FA',
+  warning: '#F59E0B',
   hero: '#25160F',
   heroBorder: '#57301F',
   heroEyebrow: '#FFB18D',
@@ -40,11 +43,14 @@ const lightColors: typeof darkColors = {
   surface: '#FFFFFF',
   card: '#FFFFFF',
   border: '#D9DCE1',
-  accent: '#D94F1F',
+  accent: '#B83D14',
+  buttonText: '#FFFFFF',
   text: '#202124',
   muted: '#62666D',
   success: '#16803C',
   error: '#B42318',
+  info: '#1D4ED8',
+  warning: '#8A5700',
   hero: '#FFF0E8',
   heroBorder: '#F2C6B1',
   heroEyebrow: '#A63D17',
@@ -174,7 +180,7 @@ export function ActionButton({
       ]}
     >
       {loading
-        ? <ActivityIndicator color={secondary ? colors.text : '#FFFFFF'} />
+        ? <ActivityIndicator color={secondary ? colors.text : colors.buttonText} />
         : <Text style={[styles.buttonText, secondary && styles.secondaryButtonText]}>{title}</Text>}
     </Pressable>
   );
@@ -224,7 +230,7 @@ function createButtonStyles(colors: ReturnType<typeof useColors>) {
     secondaryButton: { backgroundColor: colors.card, borderColor: colors.border, borderWidth: 1 },
     disabledButton: { opacity: 0.55 },
     pressed: { opacity: 0.8 },
-    buttonText: { color: '#FFFFFF', fontSize: 16, fontWeight: '700' },
+    buttonText: { color: colors.buttonText, fontSize: 16, fontWeight: '700' },
     secondaryButtonText: { color: colors.text },
   });
 }

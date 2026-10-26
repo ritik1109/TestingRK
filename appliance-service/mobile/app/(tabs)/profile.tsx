@@ -135,8 +135,8 @@ export default function ProfileScreen() {
 function statusColor(status: Booking['status'], colors: ReturnType<typeof useColors>): string {
   if (status === 'confirmed') return colors.success;
   if (status === 'rejected') return colors.error;
-  if (status === 'completed') return '#60A5FA';
-  return '#F59E0B';
+  if (status === 'completed') return colors.info;
+  return colors.warning;
 }
 
 function createStyles(colors: ReturnType<typeof useColors>) {
