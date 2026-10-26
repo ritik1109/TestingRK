@@ -1,8 +1,9 @@
 import { Stack } from 'expo-router';
-import { colors } from '@/components/ui';
+import { useColors } from '@/components/ui';
 
 /** Keep the dashboard as the app's only root page; other destinations open as pages. */
 export default function AppStack() {
+  const colors = useColors();
   return (
     <Stack
       screenOptions={{

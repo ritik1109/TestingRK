@@ -1,17 +1,18 @@
 import { Stack, router, useSegments } from 'expo-router';
 import { useEffect } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View, useColorScheme } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { AppProvider, useApp } from '@/components/AppProvider';
-import { colors } from '@/components/ui';
+import { useColors } from '@/components/ui';
 
 /** Set up shared state, safe-area-aware navigation, and platform status styling. */
 export default function RootLayout() {
+  const colorScheme = useColorScheme();
   return (
     <SafeAreaProvider>
       <AppProvider>
-        <StatusBar style="light" />
+        <StatusBar style={colorScheme === 'light' ? 'dark' : 'light'} />
         <RootNavigator />
       </AppProvider>
     </SafeAreaProvider>
@@ -20,6 +21,7 @@ export default function RootLayout() {
 
 /** Restore the customer session and keep authenticated routes behind sign-in. */
 function RootNavigator() {
+  const colors = useColors();
   const { ready, user } = useApp();
   const segments = useSegments();
   const currentRoute = segments[0];
@@ -50,6 +52,23 @@ function RootNavigator() {
 
 /** Show the app's branded mark while a saved session is restored. */
 function BrandSplash() {
+  const colors = useColors();
+  const styles = StyleSheet.create({
+    loading: { alignItems: 'center', backgroundColor: colors.background, flex: 1, justifyContent: 'center' },
+    logo: {
+      alignItems: 'center',
+      backgroundColor: colors.logoSurface,
+      borderRadius: 15,
+      flexDirection: 'row',
+      height: 76,
+      justifyContent: 'center',
+      marginBottom: 18,
+      width: 142,
+    },
+    logoFirst: { color: colors.text, fontSize: 46, fontWeight: '700', marginRight: 5 },
+    logoSecond: { color: colors.accent, fontSize: 46, fontWeight: '700' },
+    brand: { color: colors.text, fontSize: 16, fontWeight: '800', letterSpacing: 2 },
+  });
   return (
     <View accessibilityRole="progressbar" accessibilityLabel="Loading RR Appliance Service" style={styles.loading}>
       <View style={styles.logo}>
@@ -57,25 +76,6 @@ function BrandSplash() {
         <Text style={styles.logoSecond}>R</Text>
       </View>
       <Text style={styles.brand}>RR CONSULTANCY</Text>
-      <Text style={styles.tagline}>Appliance Service</Text>
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  loading: { alignItems: 'center', backgroundColor: colors.background, flex: 1, justifyContent: 'center' },
-  logo: {
-    alignItems: 'center',
-    backgroundColor: '#111111',
-    borderRadius: 15,
-    flexDirection: 'row',
-    height: 76,
-    justifyContent: 'center',
-    marginBottom: 18,
-    width: 142,
-  },
-  logoFirst: { color: colors.text, fontSize: 46, fontWeight: '700', marginRight: 5 },
-  logoSecond: { color: colors.accent, fontSize: 46, fontWeight: '700' },
-  brand: { color: colors.text, fontSize: 16, fontWeight: '800', letterSpacing: 2 },
-  tagline: { color: colors.muted, fontSize: 14, marginTop: 8 },
-});

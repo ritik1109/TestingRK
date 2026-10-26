@@ -1,13 +1,19 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { router } from 'expo-router';
 import { ScrollView, StyleSheet, Text } from 'react-native';
-import { ActionButton, colors, Field, Heading, Notice, Page } from '@/components/ui';
+import { ActionButton, useColors, Field, Heading, Notice, Page } from '@/components/ui';
 import { PostalAreaPicker } from '@/components/PostalAreaPicker';
 import { useApp } from '@/components/AppProvider';
 import { apiRequest, type User } from '@/lib/api';
 
 /** Edit the customer's contact and service-location details. */
 export default function ProfileDetailsScreen() {
+  const colors = useColors();
+  const styles = useMemo(() => StyleSheet.create({
+    page: { padding: 0 },
+    content: { gap: 14, padding: 20 },
+    phone: { color: colors.muted, fontSize: 14, marginBottom: 4 },
+  }), [colors]);
   const { user, updateUser } = useApp();
   const [name, setName] = useState(user?.name ?? '');
   const [location, setLocation] = useState(user?.location ?? '');
@@ -68,9 +74,3 @@ export default function ProfileDetailsScreen() {
     </Page>
   );
 }
-
-const styles = StyleSheet.create({
-  page: { padding: 0 },
-  content: { gap: 14, padding: 20 },
-  phone: { color: colors.muted, fontSize: 14, marginBottom: 4 },
-});

@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
-import { Field, Notice, colors } from '@/components/ui';
+import { useEffect, useMemo, useState } from 'react';
+import { StyleSheet, View } from 'react-native';
+import { Field, Notice, useColors } from '@/components/ui';
 import { apiRequest, type PostalAreaResponse } from '@/lib/api';
 
 /** Silently validate an Indian postal PIN code as the customer enters it. */
@@ -11,6 +11,11 @@ export function PostalAreaPicker({
   pinCode: string;
   onPinCodeChange: (value: string) => void;
 }) {
+  const colors = useColors();
+  const styles = useMemo(() => StyleSheet.create({
+    container: { gap: 12 },
+    validPin: { color: colors.success },
+  }), [colors]);
   const [message, setMessage] = useState('');
   const [verifiedPin, setVerifiedPin] = useState('');
 
@@ -73,8 +78,3 @@ export function PostalAreaPicker({
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  container: { gap: 12 },
-  validPin: { color: colors.success },
-});

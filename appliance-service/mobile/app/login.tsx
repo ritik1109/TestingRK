@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text } from 'react-native';
 import { router } from 'expo-router';
-import { ActionButton, Field, Heading, Notice, Page, commonStyles } from '@/components/ui';
+import { ActionButton, Field, Heading, Notice, Page, useColors, useCommonStyles } from '@/components/ui';
+import { BrandLogo } from '@/components/BrandLogo';
 import { PostalAreaPicker } from '@/components/PostalAreaPicker';
 import { useApp } from '@/components/AppProvider';
 import { apiRequest, type User } from '@/lib/api';
@@ -11,6 +12,14 @@ type AuthMode = 'signup' | 'signin';
 
 /** Handle phone verification, returning customers, and first-time profile setup. */
 export default function LoginScreen() {
+  const colors = useColors();
+  const commonStyles = useCommonStyles();
+  const styles = useMemo(() => StyleSheet.create({
+    page: { padding: 0 },
+    content: { flexGrow: 1, gap: 16, justifyContent: 'center', padding: 20 },
+    modeSwitch: { alignItems: 'center', padding: 12 },
+    modeSwitchText: { color: colors.accent, fontSize: 14, fontWeight: '700' },
+  }), [colors]);
   const { signIn } = useApp();
   const [mode, setMode] = useState<AuthMode>('signup');
   const [step, setStep] = useState<LoginStep>('phone');
@@ -137,6 +146,7 @@ export default function LoginScreen() {
   return (
     <Page style={styles.page}>
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+      <BrandLogo centered />
       <Heading subtitle={
         step === 'profile'
           ? mode === 'signup'
@@ -235,10 +245,3 @@ export default function LoginScreen() {
     </Page>
   );
 }
-
-const styles = StyleSheet.create({
-  page: { padding: 0 },
-  content: { flexGrow: 1, gap: 16, justifyContent: 'center', padding: 20 },
-  modeSwitch: { alignItems: 'center', padding: 12 },
-  modeSwitchText: { color: '#FF6B35', fontSize: 14, fontWeight: '700' },
-});

@@ -1,13 +1,16 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { useFocusEffect } from 'expo-router';
 import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { ActionButton, colors, commonStyles, Heading, Notice, Page } from '@/components/ui';
+import { ActionButton, useColors, useCommonStyles, Heading, Notice, Page } from '@/components/ui';
 import { useApp } from '@/components/AppProvider';
 import { apiRequest, type Booking } from '@/lib/api';
 import { router } from 'expo-router';
 
 /** Show the signed-in customer's booking history and current service status. */
 export default function BookingsScreen() {
+  const colors = useColors();
+  const commonStyles = useCommonStyles();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const { user } = useApp();
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [loading, setLoading] = useState(false);
@@ -54,7 +57,7 @@ export default function BookingsScreen() {
           <View key={booking._id} style={commonStyles.card}>
             <View style={styles.row}>
               <Text style={styles.title}>{booking.appliance}</Text>
-              <Text style={[styles.status, { color: statusColor(booking.status) }]}>{booking.status}</Text>
+              <Text style={[styles.status, { color: statusColor(booking.status, colors) }]}>{booking.status}</Text>
             </View>
             <Text style={commonStyles.muted}>{booking.serviceType}</Text>
             <Text style={commonStyles.muted}>{booking.preferredDate} · {booking.preferredTime}</Text>
@@ -67,17 +70,19 @@ export default function BookingsScreen() {
 }
 
 /** Map each server booking state to a readable semantic color. */
-function statusColor(status: Booking['status']): string {
+function statusColor(status: Booking['status'], colors: ReturnType<typeof useColors>): string {
   if (status === 'confirmed') return colors.success;
   if (status === 'rejected') return colors.error;
   if (status === 'completed') return '#60A5FA';
   return '#F59E0B';
 }
 
-const styles = StyleSheet.create({
+function createStyles(colors: ReturnType<typeof useColors>) {
+  return StyleSheet.create({
   page: { paddingBottom: 0 },
   list: { gap: 12, paddingBottom: 24 },
   row: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between' },
   title: { color: colors.text, flex: 1, fontSize: 17, fontWeight: '700' },
   status: { fontSize: 12, fontWeight: '700', textTransform: 'capitalize' },
-});
+  });
+}

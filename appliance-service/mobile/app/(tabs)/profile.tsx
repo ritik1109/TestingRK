@@ -1,17 +1,21 @@
 import { router, useFocusEffect } from 'expo-router';
-import { useCallback, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { ActionButton, colors, commonStyles, Heading, Notice, Page } from '@/components/ui';
+import { useCallback, useMemo, useState } from 'react';
+import { ActivityIndicator, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActionButton, useColors, useCommonStyles, Heading, Notice, Page } from '@/components/ui';
 import { AnimeAvatar } from '@/components/AnimeAvatar';
 import { useApp } from '@/components/AppProvider';
 import { apiRequest, type Booking } from '@/lib/api';
 
 /** Show a friendly illustrated account home with profile editing on a separate screen. */
 export default function ProfileScreen() {
+  const colors = useColors();
+  const commonStyles = useCommonStyles();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const { user, signOut } = useApp();
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [signOutConfirmationVisible, setSignOutConfirmationVisible] = useState(false);
 
   const loadBookings = useCallback(async () => {
     if (!user) return;
@@ -30,8 +34,16 @@ export default function ProfileScreen() {
   useFocusEffect(useCallback(() => { void loadBookings(); }, [loadBookings]));
 
   async function logOut() {
-    await signOut();
-    router.replace('/');
+    try {
+      await signOut();
+      router.replace('/');
+    } catch (error) {
+      setError(error instanceof Error ? error.message : 'Could not sign out. Please try again.');
+    }
+  }
+
+  function confirmLogOut() {
+    setSignOutConfirmationVisible(true);
   }
 
   if (!user) {
@@ -81,26 +93,54 @@ export default function ProfileScreen() {
           >
             <View style={styles.bookingRow}>
               <Text style={styles.bookingTitle}>{booking.appliance}</Text>
-              <Text style={[styles.status, { color: statusColor(booking.status) }]}>{booking.status}</Text>
+              <Text style={[styles.status, { color: statusColor(booking.status, colors) }]}>{booking.status}</Text>
             </View>
             <Text style={commonStyles.muted}>{booking.serviceType}</Text>
             <Text style={commonStyles.muted}>{booking.preferredDate} · {booking.preferredTime}</Text>
           </Pressable>
         ))}
-        <ActionButton title="Sign out" onPress={logOut} secondary />
+        <ActionButton title="Sign out" onPress={confirmLogOut} secondary />
       </ScrollView>
+      <Modal
+        animationType="fade"
+        onRequestClose={() => setSignOutConfirmationVisible(false)}
+        transparent
+        visible={signOutConfirmationVisible}
+      >
+        <View style={styles.confirmationBackdrop}>
+          <View accessibilityRole="alert" style={styles.confirmationPanel}>
+            <Text style={styles.confirmationTitle}>Sign out?</Text>
+            <Text style={styles.confirmationMessage}>Are you sure you want to sign out?</Text>
+            <View style={styles.confirmationActions}>
+              <ActionButton
+                title="Cancel"
+                onPress={() => setSignOutConfirmationVisible(false)}
+                secondary
+              />
+              <ActionButton
+                title="Sign out"
+                onPress={() => {
+                  setSignOutConfirmationVisible(false);
+                  void logOut();
+                }}
+              />
+            </View>
+          </View>
+        </View>
+      </Modal>
     </Page>
   );
 }
 
-function statusColor(status: Booking['status']): string {
+function statusColor(status: Booking['status'], colors: ReturnType<typeof useColors>): string {
   if (status === 'confirmed') return colors.success;
   if (status === 'rejected') return colors.error;
   if (status === 'completed') return '#60A5FA';
   return '#F59E0B';
 }
 
-const styles = StyleSheet.create({
+function createStyles(colors: ReturnType<typeof useColors>) {
+  return StyleSheet.create({
   page: { padding: 0 },
   content: { gap: 14, padding: 20, paddingBottom: 32 },
   identity: { alignItems: 'center', gap: 12 },
@@ -111,4 +151,10 @@ const styles = StyleSheet.create({
   bookingRow: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 },
   bookingTitle: { color: colors.text, flex: 1, fontSize: 16, fontWeight: '700' },
   status: { fontSize: 12, fontWeight: '700', textTransform: 'capitalize' },
-});
+  confirmationBackdrop: { alignItems: 'center', backgroundColor: colors.backdrop, flex: 1, justifyContent: 'center', padding: 24 },
+  confirmationPanel: { backgroundColor: colors.surface, borderColor: colors.border, borderRadius: 18, borderWidth: 1, gap: 14, maxWidth: 380, padding: 20, width: '100%' },
+  confirmationTitle: { color: colors.text, fontSize: 20, fontWeight: '800' },
+  confirmationMessage: { color: colors.muted, fontSize: 15, lineHeight: 22 },
+  confirmationActions: { flexDirection: 'row', gap: 10, justifyContent: 'flex-end' },
+  });
+}

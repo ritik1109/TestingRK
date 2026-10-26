@@ -1,8 +1,9 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
-  Animated,
   Keyboard,
+  Modal,
   Pressable,
+  RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
@@ -11,10 +12,11 @@ import {
   type TextInputFocusEvent,
 } from 'react-native';
 import { router } from 'expo-router';
-import { ActionButton, colors, commonStyles, Field, Heading, Notice, Page } from '@/components/ui';
+import { ActionButton, useColors, useCommonStyles, Field, Heading, Notice, Page } from '@/components/ui';
+import { BrandLogo } from '@/components/BrandLogo';
 import { AnimeAvatar } from '@/components/AnimeAvatar';
 import { useApp } from '@/components/AppProvider';
-import { apiRequest } from '@/lib/api';
+import { apiRequest, type User } from '@/lib/api';
 import {
   appointmentSlots,
   getAvailableAppointmentSlots,
@@ -26,26 +28,30 @@ import { appliances, services } from '@/lib/catalog';
 
 /** Present the mobile-first appliance selection and booking request flow. */
 export default function HomeScreen() {
-  const { user } = useApp();
+  const colors = useColors();
+  const commonStyles = useCommonStyles();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+  const { user, updateUser } = useApp();
   const [applianceId, setApplianceId] = useState<string | null>(null);
   const [serviceType, setServiceType] = useState<string | null>(null);
   const [preferredDate, setPreferredDate] = useState('');
   const [preferredTime, setPreferredTime] = useState('');
   const [timeInput, setTimeInput] = useState('');
   const [calendarVisible, setCalendarVisible] = useState(false);
+  const [manualDateEntry, setManualDateEntry] = useState(false);
   const [timeSlotsVisible, setTimeSlotsVisible] = useState(false);
+  const [manualTimeEntry, setManualTimeEntry] = useState(false);
   const [description, setDescription] = useState('');
   const [busy, setBusy] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
   const [message, setMessage] = useState('');
   const [now, setNow] = useState(() => new Date());
   const [appointmentSectionY, setAppointmentSectionY] = useState<number | null>(null);
   const [headerHeight, setHeaderHeight] = useState(58);
-  const [headerVisible, setHeaderVisible] = useState(true);
   const [keyboardVisible, setKeyboardVisible] = useState(false);
-  const scrollOffset = useRef(0);
-  const hideHeaderTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
+  const focusedInputTarget = useRef<number | null>(null);
   const dashboardScroll = useRef<ScrollViewInstance>(null);
-  const headerTranslateY = useRef(new Animated.Value(0)).current;
   const [calendarMonth, setCalendarMonth] = useState(() => {
     const current = new Date();
     return new Date(current.getFullYear(), current.getMonth(), 1);
@@ -69,24 +75,25 @@ export default function HomeScreen() {
   }, []);
 
   useEffect(() => {
-    const show = Keyboard.addListener('keyboardDidShow', () => setKeyboardVisible(true));
-    const hide = Keyboard.addListener('keyboardDidHide', () => setKeyboardVisible(false));
+    const show = Keyboard.addListener('keyboardDidShow', (event) => {
+      setKeyboardVisible(true);
+      setKeyboardHeight(event.endCoordinates.height);
+      const target = focusedInputTarget.current;
+      if (target !== null) {
+        setTimeout(() => {
+          dashboardScroll.current?.scrollResponderScrollNativeHandleToKeyboard(target, 180, true);
+        }, 120);
+      }
+    });
+    const hide = Keyboard.addListener('keyboardDidHide', () => {
+      setKeyboardVisible(false);
+      setKeyboardHeight(0);
+      focusedInputTarget.current = null;
+    });
     return () => {
       show.remove();
       hide.remove();
     };
-  }, []);
-
-  useEffect(() => {
-    Animated.timing(headerTranslateY, {
-      toValue: headerVisible ? 0 : -headerHeight,
-      duration: 180,
-      useNativeDriver: true,
-    }).start();
-  }, [headerHeight, headerTranslateY, headerVisible]);
-
-  useEffect(() => () => {
-    if (hideHeaderTimer.current) clearTimeout(hideHeaderTimer.current);
   }, []);
 
   useEffect(() => {
@@ -97,25 +104,50 @@ export default function HomeScreen() {
     return () => cancelAnimationFrame(frame);
   }, [appointmentSectionY, serviceType]);
 
-  function onDashboardScroll(event: { nativeEvent: { contentOffset: { y: number } } }) {
-    scrollOffset.current = event.nativeEvent.contentOffset.y;
-    if (hideHeaderTimer.current) clearTimeout(hideHeaderTimer.current);
-    setHeaderVisible(true);
-    if (!keyboardVisible && scrollOffset.current > 80) {
-      hideHeaderTimer.current = setTimeout(() => setHeaderVisible(false), 750);
-    }
+  function keepFocusedFieldVisible(event: TextInputFocusEvent) {
+    focusedInputTarget.current = event.nativeEvent.target;
   }
 
-  function keepFocusedFieldVisible(event: TextInputFocusEvent) {
-    setHeaderVisible(true);
-    if (hideHeaderTimer.current) clearTimeout(hideHeaderTimer.current);
-    requestAnimationFrame(() => {
-      dashboardScroll.current?.scrollResponderScrollNativeHandleToKeyboard(
-        event.nativeEvent.target,
-        140,
-        true,
-      );
-    });
+  function openCalendar() {
+    Keyboard.dismiss();
+    setCalendarVisible(true);
+    setTimeSlotsVisible(false);
+  }
+
+  function openTimeSlots() {
+    if (!validSelectedDate) return;
+    Keyboard.dismiss();
+    setCalendarVisible(false);
+    setTimeSlotsVisible(true);
+  }
+
+  async function refreshDashboard() {
+    setRefreshing(true);
+    Keyboard.dismiss();
+    setApplianceId(null);
+    setServiceType(null);
+    setPreferredDate('');
+    setPreferredTime('');
+    setTimeInput('');
+    setDescription('');
+    setCalendarVisible(false);
+    setManualDateEntry(false);
+    setTimeSlotsVisible(false);
+    setManualTimeEntry(false);
+    setMessage('');
+    try {
+      if (user) {
+        const response = await apiRequest<{ user: User }>('/user/profile');
+        await updateUser(response.user);
+      } else {
+        await apiRequest<{ status: string }>('/health', { skipRefresh: true });
+      }
+      setNow(new Date());
+    } catch {
+      setNow(new Date());
+    } finally {
+      setRefreshing(false);
+    }
   }
 
   useEffect(() => {
@@ -171,18 +203,13 @@ export default function HomeScreen() {
 
   return (
     <Page style={styles.page}>
-      <Animated.View
+      <View
         onLayout={(event) => setHeaderHeight(event.nativeEvent.layout.height)}
-        style={[styles.fixedHeader, { transform: [{ translateY: headerTranslateY }] }]}
+        pointerEvents="box-none"
+        style={styles.fixedHeader}
       >
         <View style={styles.dashboardHeader}>
-          <View style={styles.brand}>
-            <View style={styles.logoMark}>
-              <Text style={styles.logoR}>R</Text>
-              <Text style={styles.logoRAccent}>R</Text>
-            </View>
-            <Text style={styles.brandName}>RR SERVICE</Text>
-          </View>
+          <BrandLogo />
           {user ? (
             <Pressable
               accessibilityRole="button"
@@ -194,12 +221,24 @@ export default function HomeScreen() {
             </Pressable>
           ) : null}
         </View>
-      </Animated.View>
+      </View>
       <ScrollView
         ref={dashboardScroll}
-        contentContainerStyle={styles.content}
+        contentContainerStyle={[
+          styles.content,
+          { paddingBottom: keyboardVisible ? keyboardHeight + 48 : 40 },
+        ]}
         keyboardShouldPersistTaps="handled"
-        onScroll={onDashboardScroll}
+        refreshControl={
+          <RefreshControl
+            colors={[colors.accent]}
+            onRefresh={refreshDashboard}
+            progressViewOffset={headerHeight}
+            refreshing={refreshing}
+            progressBackgroundColor={colors.card}
+            tintColor={colors.accent}
+          />
+        }
         scrollEventThrottle={16}
       >
         <View style={{ height: headerHeight }} />
@@ -255,7 +294,13 @@ export default function HomeScreen() {
               key={item.id}
               accessibilityRole="button"
               accessibilityState={{ selected: applianceId === item.id }}
-              onPress={() => { setApplianceId(item.id); setServiceType(null); }}
+              onPress={() => {
+                setApplianceId(item.id);
+                setServiceType(services[item.id]?.[0] ?? null);
+                setPreferredDate('');
+                setPreferredTime('');
+                setTimeInput('');
+              }}
               style={[styles.appliance, applianceId === item.id && styles.selected]}
             >
               <Text style={styles.icon}>{item.icon}</Text>
@@ -282,133 +327,244 @@ export default function HomeScreen() {
             </View>
             <View onLayout={(event) => setAppointmentSectionY(event.nativeEvent.layout.y)}>
             <Text style={commonStyles.sectionTitle}>3. Preferred appointment</Text>
-            <Field
-              accessibilityLabel="Preferred date in year-month-day format"
-              autoCapitalize="none"
-              onFocus={(event) => {
-                keepFocusedFieldVisible(event);
-                setCalendarVisible(true);
-                setTimeSlotsVisible(false);
-              }}
-              onChangeText={(value) => {
-                setPreferredDate(value);
-                setPreferredTime('');
-                setTimeInput('');
-                if (isValidDateKey(value)) {
-                  const [year, month] = value.split('-').map(Number);
-                  setCalendarMonth(new Date(year, month - 1, 1));
-                }
-              }}
-              placeholder="Date (YYYY-MM-DD)"
-              value={preferredDate}
-            />
-            {calendarVisible ? <View style={styles.calendar}>
-              <View style={styles.calendarHeader}>
-                <Pressable
-                  accessibilityRole="button"
-                  accessibilityLabel="Previous month"
-                  disabled={!canGoToPreviousMonth}
-                  onPress={() => setCalendarMonth(previousMonth)}
-                  style={[styles.monthButton, !canGoToPreviousMonth && styles.unavailable]}
-                >
-                  <Text style={styles.itemText}>‹</Text>
-                </Pressable>
-                <Text style={styles.monthTitle}>
-                  {calendarMonth.toLocaleDateString(undefined, { month: 'long', year: 'numeric' })}
-                </Text>
-                <Pressable
-                  accessibilityRole="button"
-                  accessibilityLabel="Next month"
-                  onPress={() => setCalendarMonth(new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() + 1, 1))}
-                  style={styles.monthButton}
-                >
-                  <Text style={styles.itemText}>›</Text>
-                </Pressable>
-              </View>
-              <View style={styles.calendarGrid}>
-                {['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'].map((day) => (
-                  <Text key={day} style={styles.weekday}>{day}</Text>
-                ))}
-                {calendarDays.map((day, index) => {
-                  if (day === null) return <View key={`empty-${index}`} style={styles.dayCell} />;
-                  const dateKey = toDateKey(new Date(calendarMonth.getFullYear(), calendarMonth.getMonth(), day));
-                  const isUnavailable = !isBookableDateKey(dateKey, now);
-                  const selected = dateKey === preferredDate;
-                  return (
-                    <Pressable
-                      key={dateKey}
-                      accessibilityRole="button"
-                      accessibilityLabel={new Date(calendarMonth.getFullYear(), calendarMonth.getMonth(), day)
-                        .toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' })}
-                      accessibilityState={{ selected, disabled: isUnavailable }}
-                      disabled={isUnavailable}
-                      onPress={() => {
-                        setPreferredDate(dateKey);
-                        setPreferredTime('');
-                        setTimeInput('');
-                        setCalendarVisible(false);
-                        Keyboard.dismiss();
-                      }}
-                      style={[styles.dayCell, selected && styles.selected, isUnavailable && styles.unavailable]}
-                    >
-                      <Text style={[styles.dayText, isUnavailable && styles.unavailableText]}>{day}</Text>
-                    </Pressable>
-                  );
-                })}
-              </View>
-              <Text style={commonStyles.muted}>
-                Choose today or a future date.
-              </Text>
-            </View> : null}
-            <Field
-              accessibilityLabel="Preferred time slot between 10 AM and 7 PM"
-              editable={validSelectedDate}
-              onFocus={(event) => {
-                keepFocusedFieldVisible(event);
-                setTimeSlotsVisible(true);
-                setCalendarVisible(false);
-              }}
-              onChangeText={(value) => {
-                setTimeInput(value);
-                const normalize = (text: string) => text.toUpperCase().replace(/[^A-Z0-9]/g, '');
-                const matchingSlot = appointmentSlots.find((slot) =>
-                  normalize(slot.value) === normalize(value) || normalize(slot.label) === normalize(value));
-                setPreferredTime(
-                  matchingSlot && availableSlots.some((slot) => slot.value === matchingSlot.value)
-                    ? matchingSlot.value
-                    : '',
-                );
-              }}
-              placeholder={validSelectedDate ? 'Time slot (tap to choose or type)' : 'Choose a valid date first'}
-              value={timeInput}
-            />
-            {timeSlotsVisible && validSelectedDate ? (
-              availableSlots.length ? (
-                <View style={styles.timePanel}>
-                  <Text style={styles.timeTitle}>Available time slots (10 AM - 7 PM)</Text>
-                  <View style={styles.choices}>
-                  {availableSlots.map((slot) => (
-                    <Pressable
-                      key={slot.value}
-                      accessibilityRole="button"
-                      accessibilityState={{ selected: preferredTime === slot.value }}
-                      onPress={() => {
-                        setPreferredTime(slot.value);
-                        setTimeInput(slot.label);
-                        setTimeSlotsVisible(false);
-                        Keyboard.dismiss();
-                      }}
-                      style={[styles.choice, preferredTime === slot.value && styles.selected]}
-                    >
-                      <Text style={styles.itemText}>{slot.label}</Text>
-                    </Pressable>
-                  ))}
-                  </View>
+            <View style={styles.dateFieldRow}>
+              {manualDateEntry ? (
+                <View style={styles.dateField}>
+                  <Field
+                    accessibilityLabel="Preferred date in year-month-day format"
+                    editable
+                    autoCapitalize="none"
+                    onFocus={keepFocusedFieldVisible}
+                    onChangeText={(value) => {
+                      setPreferredDate(value);
+                      setPreferredTime('');
+                      setTimeInput('');
+                      if (isValidDateKey(value)) {
+                        const [year, month] = value.split('-').map(Number);
+                        setCalendarMonth(new Date(year, month - 1, 1));
+                      }
+                    }}
+                    placeholder="Date (YYYY-MM-DD)"
+                    value={preferredDate}
+                  />
                 </View>
               ) : (
-                <Notice error>No appointment slots remain today. Choose another date.</Notice>
-              )
-            ) : null}
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel="Choose appointment date"
+                  onPress={openCalendar}
+                  style={styles.dateFieldDisplay}
+                >
+                  <Text style={preferredDate ? styles.dateValue : styles.datePlaceholder}>
+                    {preferredDate || 'Date (YYYY-MM-DD)'}
+                  </Text>
+                </Pressable>
+              )}
+              {preferredDate ? (
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel="Clear appointment date"
+                  onPress={() => { setPreferredDate(''); setPreferredTime(''); setTimeInput(''); }}
+                  style={styles.calendarButton}
+                >
+                  <Text style={styles.dateClear}>×</Text>
+                </Pressable>
+              ) : null}
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Open calendar"
+                onPress={openCalendar}
+                style={styles.calendarButton}
+              >
+                <Text style={styles.calendarButtonText}>▦</Text>
+              </Pressable>
+            </View>
+            <Modal
+              animationType="fade"
+              onRequestClose={() => setCalendarVisible(false)}
+              transparent
+              visible={calendarVisible}
+            >
+              <View style={styles.calendarBackdrop}>
+                <View style={styles.calendar}>
+                  <View style={styles.calendarHeader}>
+                    <Pressable
+                      accessibilityRole="button"
+                      accessibilityLabel="Previous month"
+                      disabled={!canGoToPreviousMonth}
+                      onPress={() => setCalendarMonth(previousMonth)}
+                      style={[styles.monthButton, !canGoToPreviousMonth && styles.unavailable]}
+                    >
+                      <Text style={styles.itemText}>‹</Text>
+                    </Pressable>
+                    <Text style={styles.monthTitle}>
+                      {calendarMonth.toLocaleDateString(undefined, { month: 'long', year: 'numeric' })}
+                    </Text>
+                    <Pressable
+                      accessibilityRole="button"
+                      accessibilityLabel="Next month"
+                      onPress={() => setCalendarMonth(new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() + 1, 1))}
+                      style={styles.monthButton}
+                    >
+                      <Text style={styles.itemText}>›</Text>
+                    </Pressable>
+                  </View>
+                  <View style={styles.calendarGrid}>
+                    {['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'].map((day) => (
+                      <Text key={day} style={styles.weekday}>{day}</Text>
+                    ))}
+                    {calendarDays.map((day, index) => {
+                      if (day === null) return <View key={`empty-${index}`} style={styles.dayCell} />;
+                      const dateKey = toDateKey(new Date(calendarMonth.getFullYear(), calendarMonth.getMonth(), day));
+                      const isUnavailable = !isBookableDateKey(dateKey, now);
+                      const selected = dateKey === preferredDate;
+                      return (
+                        <Pressable
+                          key={dateKey}
+                          accessibilityRole="button"
+                          accessibilityLabel={new Date(calendarMonth.getFullYear(), calendarMonth.getMonth(), day)
+                            .toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' })}
+                          accessibilityState={{ selected, disabled: isUnavailable }}
+                          disabled={isUnavailable}
+                          onPress={() => {
+                            setPreferredDate(dateKey);
+                            setPreferredTime('');
+                            setTimeInput('');
+                            setManualDateEntry(false);
+                            setCalendarVisible(false);
+                          }}
+                          style={[styles.dayCell, selected && styles.selected, isUnavailable && styles.unavailable]}
+                        >
+                          <Text style={[styles.dayText, isUnavailable && styles.unavailableText]}>{day}</Text>
+                        </Pressable>
+                      );
+                    })}
+                  </View>
+                  <Text style={commonStyles.muted}>Choose today or a future date.</Text>
+                  <View style={styles.calendarActions}>
+                    <Pressable onPress={() => { setManualDateEntry(true); setCalendarVisible(false); }}>
+                      <Text style={styles.calendarActionText}>Enter date manually</Text>
+                    </Pressable>
+                    <Pressable onPress={() => setCalendarVisible(false)}>
+                      <Text style={styles.calendarActionText}>Close</Text>
+                    </Pressable>
+                  </View>
+                </View>
+              </View>
+            </Modal>
+            <View style={styles.bookingFieldGap} />
+            {manualTimeEntry ? (
+              <View style={styles.timeFieldRow}>
+                <View style={styles.timeField}>
+                  <Field
+                    accessibilityLabel="Preferred time slot between 10 AM and 7 PM"
+                    editable={validSelectedDate}
+                    onFocus={(event) => {
+                      keepFocusedFieldVisible(event);
+                      setTimeSlotsVisible(false);
+                    }}
+                    onChangeText={(value) => {
+                      setTimeInput(value);
+                      const normalize = (text: string) => text.toUpperCase().replace(/[^A-Z0-9]/g, '');
+                      const matchingSlot = appointmentSlots.find((slot) =>
+                        normalize(slot.value) === normalize(value) || normalize(slot.label) === normalize(value));
+                      setPreferredTime(
+                        matchingSlot && availableSlots.some((slot) => slot.value === matchingSlot.value)
+                          ? matchingSlot.value
+                          : '',
+                      );
+                    }}
+                    placeholder={validSelectedDate ? 'Time slot (e.g. 10AM-12PM)' : 'Choose a valid date first'}
+                    value={timeInput}
+                  />
+                </View>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel="Choose an available time slot"
+                  disabled={!validSelectedDate}
+                  onPress={openTimeSlots}
+                  style={styles.calendarButton}
+                >
+                  <Text style={styles.calendarButtonText}>◷</Text>
+                </Pressable>
+              </View>
+            ) : (
+              <View style={styles.dateFieldRow}>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel="Choose appointment time slot"
+                  disabled={!validSelectedDate}
+                  onPress={openTimeSlots}
+                  style={[styles.dateFieldDisplay, !validSelectedDate && styles.disabledField]}
+                >
+                  <Text style={preferredTime ? styles.dateValue : styles.datePlaceholder}>
+                    {timeInput || (validSelectedDate ? 'Choose a time slot' : 'Choose a valid date first')}
+                  </Text>
+                </Pressable>
+                {preferredTime ? (
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel="Clear appointment time"
+                    onPress={() => { setPreferredTime(''); setTimeInput(''); }}
+                    style={styles.calendarButton}
+                  >
+                    <Text style={styles.dateClear}>×</Text>
+                  </Pressable>
+                ) : null}
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel="Open time slots"
+                  disabled={!validSelectedDate}
+                  onPress={openTimeSlots}
+                  style={[styles.calendarButton, !validSelectedDate && styles.disabledField]}
+                >
+                  <Text style={styles.calendarButtonText}>◷</Text>
+                </Pressable>
+              </View>
+            )}
+            <View style={styles.bookingFieldGap} />
+            <Modal
+              animationType="fade"
+              onRequestClose={() => setTimeSlotsVisible(false)}
+              transparent
+              visible={timeSlotsVisible}
+            >
+              <View style={styles.calendarBackdrop}>
+                <View style={styles.timePanel}>
+                  <Text style={styles.timeTitle}>Available time slots</Text>
+                  {availableSlots.length ? (
+                    <View style={styles.timeChoices}>
+                      {availableSlots.map((slot) => (
+                        <Pressable
+                          key={slot.value}
+                          accessibilityRole="button"
+                          accessibilityState={{ selected: preferredTime === slot.value }}
+                          onPress={() => {
+                            setPreferredTime(slot.value);
+                            setTimeInput(slot.label);
+                            setManualTimeEntry(false);
+                            setTimeSlotsVisible(false);
+                          }}
+                          style={[styles.choice, preferredTime === slot.value && styles.selected]}
+                        >
+                          <Text style={styles.itemText}>{slot.label}</Text>
+                        </Pressable>
+                      ))}
+                    </View>
+                  ) : (
+                    <Notice error>No appointment slots remain today. Choose another date.</Notice>
+                  )}
+                  <View style={styles.calendarActions}>
+                    <Pressable onPress={() => { setManualTimeEntry(true); setTimeSlotsVisible(false); }}>
+                      <Text style={styles.calendarActionText}>Enter time manually</Text>
+                    </Pressable>
+                    <Pressable onPress={() => setTimeSlotsVisible(false)}>
+                      <Text style={styles.calendarActionText}>Close</Text>
+                    </Pressable>
+                  </View>
+                </View>
+              </View>
+            </Modal>
             <Field
               accessibilityLabel="Describe the issue (optional)"
               multiline
@@ -417,6 +573,7 @@ export default function HomeScreen() {
               placeholder="Describe the issue (optional)"
               value={description}
             />
+            <View style={styles.bookingFieldGap} />
             {message ? <Notice error={message.startsWith('Choose') || message.startsWith('Could not')}>{message}</Notice> : null}
             <ActionButton
               title={user ? 'Request booking' : 'Sign in to continue'}
@@ -431,29 +588,25 @@ export default function HomeScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+function createStyles(colors: ReturnType<typeof useColors>) {
+  return StyleSheet.create({
   page: { padding: 0 },
   content: { gap: 20, paddingHorizontal: 20, paddingBottom: 40 },
-  fixedHeader: { backgroundColor: colors.background, elevation: 8, left: 0, paddingHorizontal: 20, paddingVertical: 10, position: 'absolute', right: 0, top: 0, zIndex: 5 },
+  fixedHeader: { backgroundColor: colors.background, elevation: colors.isDark ? 8 : 0, left: 0, paddingHorizontal: 20, paddingVertical: 10, position: 'absolute', right: 0, shadowOpacity: colors.isDark ? 0.18 : 0, top: 0, zIndex: 5 },
   dashboardHeader: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between', marginBottom: 2 },
-  brand: { alignItems: 'center', flexDirection: 'row', gap: 9 },
-  logoMark: { alignItems: 'center', backgroundColor: '#171717', borderColor: colors.border, borderRadius: 10, borderWidth: 1, flexDirection: 'row', height: 38, justifyContent: 'center', width: 48 },
-  logoR: { color: colors.text, fontSize: 23, fontWeight: '800' },
-  logoRAccent: { color: colors.accent, fontSize: 23, fontWeight: '800', marginLeft: -2 },
-  brandName: { color: colors.text, fontSize: 12, fontWeight: '800', letterSpacing: 1.5 },
   avatarButton: { borderRadius: 24, padding: 2 },
-  heroCard: { alignItems: 'center', backgroundColor: '#25160F', borderColor: '#57301F', borderRadius: 20, borderWidth: 1, flexDirection: 'row', justifyContent: 'space-between', minHeight: 142, overflow: 'hidden', padding: 20 },
+  heroCard: { alignItems: 'center', backgroundColor: colors.hero, borderColor: colors.heroBorder, borderRadius: 20, borderWidth: 1, flexDirection: 'row', justifyContent: 'space-between', minHeight: 142, overflow: 'hidden', padding: 20 },
   heroCopy: { flex: 1, gap: 8 },
-  heroEyebrow: { color: '#FFB18D', fontSize: 10, fontWeight: '800', letterSpacing: 1.7 },
+  heroEyebrow: { color: colors.heroEyebrow, fontSize: 10, fontWeight: '800', letterSpacing: 1.7 },
   heroTitle: { color: colors.text, fontSize: 22, fontWeight: '800' },
-  heroSubtitle: { color: '#D2B6A8', fontSize: 13, lineHeight: 19, maxWidth: 230 },
+  heroSubtitle: { color: colors.heroText, fontSize: 13, lineHeight: 19, maxWidth: 230 },
   heroIcon: { fontSize: 46, marginLeft: 10 },
   sectionHeader: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between', marginBottom: -8 },
   sectionTitle: { color: colors.text, fontSize: 19, fontWeight: '800' },
   sectionHint: { color: colors.muted, fontSize: 12, fontWeight: '600' },
   popularGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
   popularCard: { backgroundColor: colors.card, borderColor: colors.border, borderRadius: 16, borderWidth: 1, flexBasis: '48%', flexGrow: 1, gap: 5, minHeight: 126, padding: 13 },
-  popularIcon: { alignItems: 'center', backgroundColor: '#30231E', borderRadius: 12, height: 40, justifyContent: 'center', marginBottom: 4, width: 40 },
+  popularIcon: { alignItems: 'center', backgroundColor: colors.iconSurface, borderRadius: 12, height: 40, justifyContent: 'center', marginBottom: 4, width: 40 },
   popularEmoji: { fontSize: 22 },
   popularTitle: { color: colors.text, fontSize: 14, fontWeight: '700' },
   popularDetail: { color: colors.muted, fontSize: 12 },
@@ -474,17 +627,34 @@ const styles = StyleSheet.create({
   itemText: { color: colors.text, fontSize: 14, fontWeight: '600', textAlign: 'center' },
   choices: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   choice: { backgroundColor: colors.card, borderColor: colors.border, borderRadius: 22, borderWidth: 1, paddingHorizontal: 15, paddingVertical: 11 },
-  selected: { borderColor: colors.accent, backgroundColor: '#32190F' },
-  calendar: { backgroundColor: colors.card, borderColor: colors.border, borderRadius: 14, borderWidth: 1, gap: 12, padding: 12 },
+  selected: { borderColor: colors.accent, backgroundColor: colors.selected },
+  dateFieldRow: { alignItems: 'center', flexDirection: 'row', gap: 8 },
+  bookingFieldGap: { height: 10 },
+  dateField: { flex: 1 },
+  dateFieldDisplay: { alignItems: 'center', backgroundColor: colors.card, borderColor: colors.border, borderRadius: 12, borderWidth: 1, flex: 1, flexDirection: 'row', justifyContent: 'space-between', minHeight: 54, paddingHorizontal: 14 },
+  dateValue: { color: colors.text, flex: 1, fontSize: 16 },
+  datePlaceholder: { color: colors.muted, flex: 1, fontSize: 16 },
+  dateClear: { color: colors.muted, fontSize: 25, lineHeight: 30 },
+  calendarButton: { alignItems: 'center', backgroundColor: colors.card, borderColor: colors.border, borderRadius: 12, borderWidth: 1, height: 54, justifyContent: 'center', width: 54 },
+  calendarButtonText: { color: colors.accent, fontSize: 22 },
+  calendarBackdrop: { alignItems: 'center', backgroundColor: colors.backdrop, flex: 1, justifyContent: 'center', padding: 20 },
+  calendar: { backgroundColor: colors.surface, borderColor: colors.border, borderRadius: 16, borderWidth: 1, gap: 8, maxWidth: 330, padding: 12, width: '100%' },
   calendarHeader: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between' },
-  monthButton: { alignItems: 'center', borderColor: colors.border, borderRadius: 10, borderWidth: 1, height: 40, justifyContent: 'center', width: 44 },
-  monthTitle: { color: colors.text, fontSize: 16, fontWeight: '700' },
+  monthButton: { alignItems: 'center', borderColor: colors.border, borderRadius: 8, borderWidth: 1, height: 32, justifyContent: 'center', width: 36 },
+  monthTitle: { color: colors.text, fontSize: 14, fontWeight: '700' },
   calendarGrid: { flexDirection: 'row', flexWrap: 'wrap' },
-  weekday: { color: colors.muted, fontSize: 12, fontWeight: '700', paddingVertical: 8, textAlign: 'center', width: '14.2857%' },
-  dayCell: { alignItems: 'center', borderColor: 'transparent', borderRadius: 10, borderWidth: 1, height: 42, justifyContent: 'center', width: '14.2857%' },
-  dayText: { color: colors.text, fontSize: 14, fontWeight: '600' },
+  weekday: { color: colors.muted, fontSize: 10, fontWeight: '700', paddingVertical: 4, textAlign: 'center', width: '14.2857%' },
+  dayCell: { alignItems: 'center', borderColor: 'transparent', borderRadius: 8, borderWidth: 1, height: 34, justifyContent: 'center', width: '14.2857%' },
+  dayText: { color: colors.text, fontSize: 12, fontWeight: '600' },
+  calendarActions: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between', paddingTop: 4 },
+  calendarActionText: { color: colors.accent, fontSize: 13, fontWeight: '700', paddingVertical: 6 },
   unavailable: { opacity: 0.35 },
   unavailableText: { color: colors.muted },
   timeTitle: { color: colors.text, fontSize: 15, fontWeight: '700' },
-  timePanel: { backgroundColor: colors.card, borderColor: colors.border, borderRadius: 14, borderWidth: 1, gap: 12, padding: 12 },
-});
+  timePanel: { backgroundColor: colors.surface, borderColor: colors.border, borderRadius: 16, borderWidth: 1, gap: 12, maxWidth: 330, padding: 14, width: '100%' },
+  timeFieldRow: { alignItems: 'center', flexDirection: 'row', gap: 8 },
+  timeField: { flex: 1 },
+  timeChoices: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  disabledField: { opacity: 0.5 },
+  });
+}
