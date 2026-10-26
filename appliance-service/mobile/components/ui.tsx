@@ -40,11 +40,18 @@ export function Heading({ children, subtitle }: { children: React.ReactNode; sub
 /** Style text fields consistently while preserving platform-native input behavior. */
 export function Field(props: TextInputProps) {
   return (
-    <TextInput
-      placeholderTextColor={colors.muted}
-      style={[styles.field, props.multiline && styles.multiline]}
-      {...props}
-    />
+    <View style={[styles.fieldShell, props.multiline && styles.multilineShell]}>
+      <TextInput
+        placeholderTextColor={colors.muted}
+        selectionColor={colors.accent}
+        underlineColorAndroid="transparent"
+        {...props}
+        autoComplete="off"
+        textContentType="none"
+        style={[styles.field, props.multiline && styles.multiline, props.style]}
+        importantForAutofill="no"
+      />
+    </View>
   );
 }
 
@@ -98,8 +105,10 @@ const styles = StyleSheet.create({
   heading: { gap: 6, marginBottom: 4 },
   title: { color: colors.text, fontSize: 28, fontWeight: '800' },
   subtitle: { color: colors.muted, fontSize: 15, lineHeight: 21 },
-  field: { backgroundColor: colors.card, borderColor: colors.border, borderRadius: 12, borderWidth: 1, color: colors.text, fontSize: 16, minHeight: 54, paddingHorizontal: 15, paddingVertical: 12 },
-  multiline: { minHeight: 92, textAlignVertical: 'top' },
+  fieldShell: { backgroundColor: colors.card, borderColor: colors.border, borderRadius: 12, borderWidth: 1, justifyContent: 'center', minHeight: 54, paddingHorizontal: 14, paddingVertical: 4 },
+  multilineShell: { minHeight: 100, paddingVertical: 4 },
+  field: { backgroundColor: 'transparent', borderWidth: 0, color: colors.text, fontSize: 16, minHeight: 42, padding: 0 },
+  multiline: { minHeight: 90, textAlignVertical: 'top' },
   button: { alignItems: 'center', backgroundColor: colors.accent, borderRadius: 12, justifyContent: 'center', minHeight: 52, paddingHorizontal: 16 },
   secondaryButton: { backgroundColor: colors.card, borderColor: colors.border, borderWidth: 1 },
   disabledButton: { opacity: 0.55 },

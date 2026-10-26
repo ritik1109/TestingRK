@@ -1,7 +1,8 @@
 import { useState } from 'react';
-import { Pressable, StyleSheet, Text } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text } from 'react-native';
 import { router } from 'expo-router';
 import { ActionButton, Field, Heading, Notice, Page, commonStyles } from '@/components/ui';
+import { PostalAreaPicker } from '@/components/PostalAreaPicker';
 import { useApp } from '@/components/AppProvider';
 import { apiRequest, type User } from '@/lib/api';
 
@@ -39,13 +40,13 @@ export default function LoginScreen() {
       return;
     }
     if (mode === 'signup' && (!name.trim() || !location.trim() || !/^[1-9]\d{5}$/.test(pinCode.trim()))) {
-      setMessage('Enter your name, local area, and a valid 6-digit PIN code before continuing.');
+      setMessage('Enter your name, area, and a valid 6-digit PIN code before continuing.');
       return;
     }
     setBusy(true);
     setMessage('');
     try {
-      await apiRequest('/auth/send-otp', { method: 'POST', body: { phone: digits } });
+      await apiRequest('/auth/send-otp', { method: 'POST', body: { phone: digits, intent: mode } });
       setPhone(digits);
       setStep('otp');
     } catch (error) {
@@ -108,7 +109,7 @@ export default function LoginScreen() {
   /** Complete registration with the temporary verified session before navigating. */
   async function completeProfile() {
     if (!name.trim() || !location.trim() || !/^[1-9]\d{5}$/.test(pinCode.trim()) || pinAddress.length > 300) {
-      setMessage('Enter your name, local area, a valid 6-digit PIN code, and keep the address under 300 characters.');
+      setMessage('Enter your name, verify your PIN code, select your area, and keep the address under 300 characters.');
       return;
     }
     setBusy(true);
@@ -135,6 +136,7 @@ export default function LoginScreen() {
 
   return (
     <Page style={styles.page}>
+      <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
       <Heading subtitle={
         step === 'profile'
           ? mode === 'signup'
@@ -157,16 +159,13 @@ export default function LoginScreen() {
           </Text>
           {mode === 'signup' ? (
             <>
-              <Field accessibilityLabel="Full name" autoComplete="name" onChangeText={setName} placeholder="Full name" value={name} />
-              <Field accessibilityLabel="Local area or place name" onChangeText={setLocation} placeholder="Local area / place name" value={location} />
-              <Field
-                accessibilityLabel="Six-digit postal PIN code"
-                keyboardType="number-pad"
-                maxLength={6}
-                onChangeText={setPinCode}
-                placeholder="6-digit PIN code"
-                value={pinCode}
+              <Field accessibilityLabel="Full name" autoComplete="off" onChangeText={setName} placeholder="Full name" value={name} />
+              <PostalAreaPicker
+                pinCode={pinCode}
+                onPinCodeChange={setPinCode}
               />
+              <Field accessibilityLabel="Local area or place name" onChangeText={setLocation} placeholder="Local area / place name" value={location} />
+              <Field accessibilityLabel="House, street, or landmark (optional)" autoComplete="street-address" onChangeText={setPinAddress} placeholder="House, street, or landmark (optional)" value={pinAddress} />
             </>
           ) : null}
           <Field
@@ -220,31 +219,26 @@ export default function LoginScreen() {
         <>
           {mode === 'signin' ? (
             <>
-              <Field accessibilityLabel="Full name" autoComplete="name" onChangeText={setName} placeholder="Full name" value={name} />
+              <Field accessibilityLabel="Full name" autoComplete="off" onChangeText={setName} placeholder="Full name" value={name} />
               <Field accessibilityLabel="Local area or place name" onChangeText={setLocation} placeholder="Local area / place name" value={location} />
-              <Field
-                accessibilityLabel="Six-digit postal PIN code"
-                keyboardType="number-pad"
-                maxLength={6}
-                onChangeText={setPinCode}
-                placeholder="6-digit PIN code"
-                value={pinCode}
-              />
+              <PostalAreaPicker pinCode={pinCode} onPinCodeChange={setPinCode} />
+              <Field accessibilityLabel="House, street, or landmark (optional)" autoComplete="street-address" onChangeText={setPinAddress} placeholder="House, street, or landmark (optional)" value={pinAddress} />
             </>
           ) : (
-            <Text style={commonStyles.muted}>Your name, area, and PIN code are ready. Add an address if you want.</Text>
+            <Text style={commonStyles.muted}>Your name, area, and PIN code are ready.</Text>
           )}
-          <Field accessibilityLabel="House, street, or landmark (optional)" autoComplete="street-address" multiline onChangeText={setPinAddress} placeholder="House, street, or landmark (optional)" value={pinAddress} />
           <ActionButton title={mode === 'signup' ? 'Create account' : 'Save and continue'} loading={busy} onPress={completeProfile} />
         </>
       ) : null}
       {message ? <Notice error>{message}</Notice> : null}
+      </ScrollView>
     </Page>
   );
 }
 
 const styles = StyleSheet.create({
-  page: { justifyContent: 'center' },
+  page: { padding: 0 },
+  content: { flexGrow: 1, gap: 16, justifyContent: 'center', padding: 20 },
   modeSwitch: { alignItems: 'center', padding: 12 },
   modeSwitchText: { color: '#FF6B35', fontSize: 14, fontWeight: '700' },
 });

@@ -19,6 +19,7 @@ const {
   normalizePhone,
   validText,
 } = require('./lib/validation');
+const { getPostalAreas } = require('./lib/postal');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -325,13 +326,25 @@ function adminMiddleware(req, res, next) {
 // POST /api/auth/send-otp
 app.post(
   '/api/auth/send-otp',
+  rateLimit({ windowMs: 15 * 60 * 1000, max: 30 }),
+  rateLimit({ windowMs: 15 * 60 * 1000, max: 5, key: (req) => normalizePhone(req.body?.phone) }),
   rateLimit({ windowMs: 15 * 60 * 1000, max: 5, key: (req) => `${req.ip}:${normalizePhone(req.body?.phone)}` }),
   asyncHandler(async (req, res) => {
-    const { phone } = req.body;
+    const { phone, intent } = req.body;
     const normalizedPhone = normalizePhone(phone);
 
     if (normalizedPhone.length !== 10) {
       return res.status(400).json({ error: 'Invalid phone number. Must be 10 digits.' });
+    }
+    if (intent != null && !['signup', 'signin'].includes(intent)) {
+      return res.status(400).json({ error: 'Choose sign up or sign in to continue.' });
+    }
+    if (intent) {
+      const user = await User.findOne({ phone: normalizedPhone });
+      const intentError = getAuthIntentError(intent, Boolean(user));
+      if (intentError) {
+        return res.status(intent === 'signup' ? 409 : 404).json({ error: intentError });
+      }
     }
 
     const now = Date.now();
@@ -410,7 +423,7 @@ app.post(
       return res.status(400).json({ error: 'Invalid OTP' });
     }
 
-    const user = await User.findOne({ phone: normalizedPhone });
+    let user = await User.findOne({ phone: normalizedPhone });
     const intentError = getAuthIntentError(intent, Boolean(user));
     if (intentError) {
       return res.status(intent === 'signup' ? 409 : 404).json({ error: intentError });
@@ -481,6 +494,29 @@ app.post('/api/auth/logout', rateLimit({ windowMs: 15 * 60 * 1000, max: 30 }), a
 
 // ─── USER ROUTES ───────────────────────────────────────────────────────────
 
+// GET /api/location/pincode/:pinCode
+app.get(
+  '/api/location/pincode/:pinCode',
+  rateLimit({ windowMs: 15 * 60 * 1000, max: 20 }),
+  asyncHandler(async (req, res) => {
+    const { pinCode } = req.params;
+    if (!isValidPinCode(pinCode)) {
+      return res.status(400).json({ error: 'Enter a valid 6-digit Indian PIN code.' });
+    }
+    let areas;
+    try {
+      areas = await getPostalAreas(pinCode);
+    } catch (error) {
+      console.error(`[PIN lookup] Postal service unavailable: ${error.message}`);
+      return res.status(503).json({ error: 'PIN code lookup is temporarily unavailable. Please try again.' });
+    }
+    if (!areas.length) {
+      return res.status(404).json({ error: 'PIN code not found. Please enter the correct PIN code.' });
+    }
+    res.json({ pinCode, areas });
+  })
+);
+
 // GET /api/user/profile
 app.get(
   '/api/user/profile',
@@ -503,6 +539,18 @@ app.put(
       || (pinCode != null && !isValidPinCode(pinCode))
       || (pinAddress != null && (typeof pinAddress !== 'string' || pinAddress.length > 300))) {
       return res.status(400).json({ error: 'Enter a valid name and local area; PIN code must be six digits.' });
+    }
+    if (pinCode != null) {
+      let areas;
+      try {
+        areas = await getPostalAreas(pinCode);
+      } catch (error) {
+        console.error(`[PIN lookup] Postal service unavailable: ${error.message}`);
+        return res.status(503).json({ error: 'PIN code lookup is temporarily unavailable. Please try again.' });
+      }
+      if (!areas.length) {
+        return res.status(400).json({ error: 'PIN code not found. Please enter the correct PIN code.' });
+      }
     }
     const updates = { name: name.trim(), location: location.trim(), profileComplete: true };
     if (pinCode != null) updates.pinCode = pinCode;

@@ -523,7 +523,8 @@
     </div>
     <div class="form-group" style="width:100%">
       <label>PIN Code</label>
-      <input id="reg-pin" type="tel" maxlength="6" placeholder="452001"/>
+      <input id="reg-pin" type="tel" maxlength="6" placeholder="452001" oninput="lookupRegistrationPin()"/>
+      <small id="reg-pin-status"></small>
     </div>
     <button class="btn btn-primary" onclick="submitProfile()">Complete Registration</button>
   </div>
@@ -1104,6 +1105,38 @@ function otpPaste(e) {
   const last = Math.min(text.length, 5);
   document.getElementById('otp'+last).focus();
   if(text.length === 6) setTimeout(verifyOTP, 200);
+}
+
+let pinLookupTimer;
+let pinLookupRequest = 0;
+
+function clearRegistrationAreas() {
+  document.getElementById('reg-pin').style.color = '';
+  document.getElementById('reg-pin-status').textContent = '';
+}
+
+function lookupRegistrationPin() {
+  const pin = document.getElementById('reg-pin').value.trim();
+  clearTimeout(pinLookupTimer);
+  const requestId = ++pinLookupRequest;
+  clearRegistrationAreas();
+  if(!/^[1-9]\d{5}$/.test(pin)) return;
+  pinLookupTimer = setTimeout(async () => {
+    try {
+      const r = await fetch(`${API}/location/pincode/${encodeURIComponent(pin)}`);
+      const d = await r.json();
+      if(!r.ok) throw new Error(d.error || 'PIN code not found. Please enter the correct PIN code.');
+      if(requestId !== pinLookupRequest) return;
+      document.getElementById('reg-pin').style.color = '#22c55e';
+      document.getElementById('reg-pin-status').textContent = '';
+    } catch(e) {
+      if(requestId !== pinLookupRequest) return;
+      document.getElementById('reg-pin').style.color = '';
+      document.getElementById('reg-pin-status').textContent = e.message && e.message.includes('not found')
+        ? 'PIN code not found. Please enter the correct PIN code.'
+        : 'Could not check the PIN code right now. Please try again.';
+    }
+  }, 350);
 }
 
 async function verifyOTP() {

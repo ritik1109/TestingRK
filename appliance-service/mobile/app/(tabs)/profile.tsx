@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { ScrollView, StyleSheet, Text } from 'react-native';
 import { router } from 'expo-router';
 import { ActionButton, Field, Heading, Notice, Page } from '@/components/ui';
+import { PostalAreaPicker } from '@/components/PostalAreaPicker';
 import { useApp } from '@/components/AppProvider';
 import { apiRequest, type User } from '@/lib/api';
 
@@ -24,8 +25,8 @@ export default function ProfileScreen() {
 
   /** Save only editable profile fields; the backend derives the account from the token. */
   async function saveProfile() {
-    if (pinCode && !/^[1-9]\d{5}$/.test(pinCode.trim())) {
-      setMessage('Enter a valid 6-digit PIN code.');
+    if (pinCode && (!/^[1-9]\d{5}$/.test(pinCode.trim()) || !location.trim())) {
+      setMessage('Verify the PIN code and select a matching area.');
       return;
     }
     setBusy(true);
@@ -65,7 +66,10 @@ export default function ProfileScreen() {
         <Heading subtitle={`Phone: +91 ${user.phone}`}>Your profile</Heading>
         <Field accessibilityLabel="Full name" onChangeText={setName} placeholder="Full name" value={name} />
         <Field accessibilityLabel="Local area or place name" onChangeText={setLocation} placeholder="Local area / place name" value={location} />
-        <Field accessibilityLabel="Six-digit postal PIN code" keyboardType="number-pad" maxLength={6} onChangeText={setPinCode} placeholder="6-digit PIN code" value={pinCode} />
+        <PostalAreaPicker
+          pinCode={pinCode}
+          onPinCodeChange={setPinCode}
+        />
         <Field accessibilityLabel="House, street, or landmark" multiline onChangeText={setPinAddress} placeholder="House, street, or landmark (optional)" value={pinAddress} />
         {message ? <Notice error={message.startsWith('Could not')}>{message}</Notice> : null}
         <ActionButton title="Save profile" loading={busy} onPress={saveProfile} />

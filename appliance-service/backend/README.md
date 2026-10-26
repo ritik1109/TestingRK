@@ -19,6 +19,16 @@ Set `FAST2SMS_API_KEY` before enabling OTP login. On delivery failure the API
 returns an error and invalidates the unsent code. A development-only OTP
 response is available only when `NODE_ENV` is not `production` and
 `OTP_INCLUDE_IN_RESPONSE=true`.
+Mobile OTP requests include the selected sign-up/sign-in intent; the API checks
+account existence before sending an SMS and refuses mismatched choices. This
+reveals account existence to the requester, so OTP requests are rate-limited by
+IP and phone number.
+
+Customer PIN codes are checked against the India Post public postal lookup
+service. Profile saves require a recognized PIN code; customers enter their
+locality and street address themselves. Backend hosting must allow outbound
+HTTPS access to `api.postalpincode.in`; temporary provider outages are reported
+as a retryable service error.
 
 ## Run and test
 

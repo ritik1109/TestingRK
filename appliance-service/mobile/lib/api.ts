@@ -30,6 +30,11 @@ export interface Booking {
   userLocation: string;
 }
 
+export interface PostalAreaResponse {
+  pinCode: string;
+  areas: string[];
+}
+
 export class ApiError extends Error {
   constructor(message: string, readonly status: number) {
     super(message);
