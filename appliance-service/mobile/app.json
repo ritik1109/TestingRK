@@ -1,0 +1,43 @@
+{
+  "expo": {
+    "name": "RR Appliance Service",
+    "slug": "rr-appliance-service",
+    "scheme": "rrappliance",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "automatic",
+    "plugins": [
+      "expo-router",
+      "expo-secure-store"
+    ],
+    "ios": {
+      "bundleIdentifier": "com.rrconsultancy.applianceservice",
+      "supportsTablet": true
+    },
+    "android": {
+      "package": "com.rrconsultancy.applianceservice",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#0D0D0D"
+      },
+      "softwareKeyboardLayoutMode": "resize"
+    },
+    "web": {
+      "bundler": "metro"
+    },
+    "experiments": {
+      "typedRoutes": true
+    },
+    "extra": {
+      "router": {
+        "asyncRoutes": {
+          "web": true
+        }
+      },
+      "eas": {
+        "projectId": "f6ee74db-8d17-4688-9efc-214d600272c5"
+      }
+    }
+  }
+}

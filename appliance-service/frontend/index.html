@@ -514,16 +514,17 @@
       <input id="reg-name" type="text" placeholder="Rahul Sharma"/>
     </div>
     <div class="form-group" style="width:100%">
-      <label>Location / City</label>
-      <input id="reg-location" type="text" placeholder="Indore, Madhya Pradesh"/>
+      <label>Local Area / Place Name</label>
+      <input id="reg-location" type="text" placeholder="Area or locality name"/>
     </div>
     <div class="form-group" style="width:100%">
-      <label>Full Address</label>
-      <input id="reg-address" type="text" placeholder="123 Main Street, Sector 5"/>
+      <label>House, Street, or Landmark (optional)</label>
+      <input id="reg-address" type="text" placeholder="House number, street, or landmark"/>
     </div>
     <div class="form-group" style="width:100%">
       <label>PIN Code</label>
-      <input id="reg-pin" type="tel" maxlength="6" placeholder="452001"/>
+      <input id="reg-pin" type="tel" maxlength="6" placeholder="452001" oninput="lookupRegistrationPin()"/>
+      <small id="reg-pin-status"></small>
     </div>
     <button class="btn btn-primary" onclick="submitProfile()">Complete Registration</button>
   </div>
@@ -575,11 +576,11 @@
         <div class="form-group">
           <label>Preferred Time Slot</label>
           <select id="booking-time">
-            <option value="9AM-11AM">9:00 AM – 11:00 AM</option>
-            <option value="11AM-1PM">11:00 AM – 1:00 PM</option>
-            <option value="1PM-3PM">1:00 PM – 3:00 PM</option>
-            <option value="3PM-5PM">3:00 PM – 5:00 PM</option>
-            <option value="5PM-7PM">5:00 PM – 7:00 PM</option>
+            <option value="10AM-12PM">10:00 AM – 12:00 PM</option>
+            <option value="12PM-2PM">12:00 PM – 2:00 PM</option>
+            <option value="2PM-4PM">2:00 PM – 4:00 PM</option>
+            <option value="4PM-6PM">4:00 PM – 6:00 PM</option>
+            <option value="6PM-7PM">6:00 PM – 7:00 PM</option>
           </select>
         </div>
         <div class="form-group">
@@ -667,7 +668,6 @@
       <input id="admin-password" type="password" placeholder="••••••••"/>
     </div>
     <button class="btn btn-primary" style="background:linear-gradient(135deg,#4f46e5,#818cf8);" onclick="adminLogin()">Login to Admin</button>
-    <!-- <p class="text-muted mt16" style="font-size:11px;">Default: admin / Admin@1234</p> -->
   </div>
 </div>
 
@@ -711,7 +711,8 @@
   font-family:'DM Sans',sans-serif;
   pointer-events:none;
 ">
-  Developed by <span style="color:var(--accent);font-weight:600;">Ritik Soni</span>
+  <span>Developed by <span style="color:var(--accent);font-weight:600;">Ritik Soni</span></span><br/>
+  <span>Soni Groups</span>
 </div>
 
 <script>
@@ -748,7 +749,7 @@ async function checkBackend() {
 //  STATE
 // ═══════════════════════════════════════════════════════════════════
 const state = {
-  token: localStorage.getItem('token') || null,
+  token: sessionStorage.getItem('token') || null,
   user: null,
   // adminToken: localStorage.getItem('adminToken') || null,
   adminToken: null, // Disable admin login for now
@@ -759,6 +760,9 @@ const state = {
   afterLogin: null,       // page to go after login
   bookingAppliance: null  // appliance to book after login
 };
+// Remove persistent tokens from the legacy storage format during the migration.
+localStorage.removeItem('token');
+localStorage.removeItem('user');
 
 // ═══════════════════════════════════════════════════════════════════
 //  APPLIANCES DATA
@@ -799,9 +803,57 @@ const services = {
 function init() {
   renderAppliances(appliances);
   updateTopbar();
-  // Set min booking date to today
+  // Use the device-local calendar date so customers can book for today.
   const d = document.getElementById('booking-date');
-  if(d) d.min = new Date().toISOString().split('T')[0];
+  if(d) {
+    d.min = localDateKey();
+    d.addEventListener('change', syncBookingTimeSlots);
+    syncBookingTimeSlots();
+  }
+}
+
+/** Format today's local date for native date inputs without UTC day shifts. */
+function localDateKey(date = new Date()) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+/** Show only future service windows when a customer selects today's date. */
+function syncBookingTimeSlots() {
+  const dateInput = document.getElementById('booking-date');
+  const timeSelect = document.getElementById('booking-time');
+  if(!dateInput || !timeSelect) return;
+  const today = localDateKey();
+  const slots = [
+    { value: '10AM-12PM', label: '10:00 AM – 12:00 PM', startMinute: 10 * 60 },
+    { value: '12PM-2PM', label: '12:00 PM – 2:00 PM', startMinute: 12 * 60 },
+    { value: '2PM-4PM', label: '2:00 PM – 4:00 PM', startMinute: 14 * 60 },
+    { value: '4PM-6PM', label: '4:00 PM – 6:00 PM', startMinute: 16 * 60 },
+    { value: '6PM-7PM', label: '6:00 PM – 7:00 PM', startMinute: 18 * 60 },
+  ];
+  const currentValue = timeSelect.value;
+  const currentMinute = new Date().getHours() * 60 + new Date().getMinutes();
+  const todaySlots = slots.filter(slot => slot.startMinute > currentMinute);
+  const todayUnavailable = todaySlots.length === 0;
+  const tomorrow = new Date();
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  dateInput.min = todayUnavailable ? localDateKey(tomorrow) : today;
+  if(dateInput.value && dateInput.value < dateInput.min) dateInput.value = '';
+
+  const available = dateInput.value === today
+    ? todaySlots
+    : slots;
+
+  timeSelect.replaceChildren(new Option(
+    'Choose a time slot',
+    '',
+    true,
+    true
+  ));
+  available.forEach(slot => timeSelect.add(new Option(slot.label, slot.value)));
+  if(available.some(slot => slot.value === currentValue)) timeSelect.value = currentValue;
 }
 
 // ═══════════════════════════════════════════════════════════════════
@@ -812,7 +864,7 @@ function renderAppliances(list) {
   grid.innerHTML = list.map(a => `
     <div class="appliance-card" onclick="selectAppliance('${a.id}')">
       <div class="icon">${a.icon}</div>
-      <div class="name">${a.name}</div>
+      <div class="name">${escapeHtml(a.name)}</div>
       ${a.tag ? `<div class="tag">${a.tag}</div>` : '<div style="height:16px;"></div>'}
     </div>
   `).join('');
@@ -931,20 +983,21 @@ function buildConfirmSummary() {
   const time = document.getElementById('booking-time').value;
   const desc = document.getElementById('booking-desc').value;
   if(!date){ toast('Please select a date','error'); nextStep(2); return; }
+  if(!time){ toast('Please select an available time slot','error'); nextStep(2); return; }
   document.getElementById('confirm-summary').innerHTML = `
     <div class="bc-header">
-      <div><h4>${a.icon} ${a.name} – ${state.selectedService}</h4><div class="bc-meta">${state.user?.name || ''}</div></div>
+      <div><h4>${a.icon} ${escapeHtml(a.name)} – ${escapeHtml(state.selectedService)}</h4><div class="bc-meta">${escapeHtml(state.user?.name || '')}</div></div>
       <div class="badge badge-pending">Pending</div>
     </div>
     <div class="bc-row">
-      <div class="bc-tag">📅 ${date}</div>
-      <div class="bc-tag">🕐 ${time}</div>
+      <div class="bc-tag">📅 ${escapeHtml(date)}</div>
+      <div class="bc-tag">🕐 ${escapeHtml(time)}</div>
     </div>
     <div class="bc-row">
-      <div class="bc-tag">📍 ${state.user?.location||'—'}</div>
-      <div class="bc-tag">📌 ${state.user?.pinAddress||'—'}</div>
+      <div class="bc-tag">📍 ${escapeHtml(state.user?.location||'—')}</div>
+      <div class="bc-tag">📌 ${escapeHtml(state.user?.pinAddress||'—')}</div>
     </div>
-    ${desc?`<p style="font-size:12px;color:var(--muted);margin-top:8px;">📝 ${desc}</p>`:''}
+    ${desc?`<p style="font-size:12px;color:var(--muted);margin-top:8px;">📝 ${escapeHtml(desc)}</p>`:''}
   `;
 }
 
@@ -1055,6 +1108,38 @@ function otpPaste(e) {
   if(text.length === 6) setTimeout(verifyOTP, 200);
 }
 
+let pinLookupTimer;
+let pinLookupRequest = 0;
+
+function clearRegistrationAreas() {
+  document.getElementById('reg-pin').style.color = '';
+  document.getElementById('reg-pin-status').textContent = '';
+}
+
+function lookupRegistrationPin() {
+  const pin = document.getElementById('reg-pin').value.trim();
+  clearTimeout(pinLookupTimer);
+  const requestId = ++pinLookupRequest;
+  clearRegistrationAreas();
+  if(!/^[1-9]\d{5}$/.test(pin)) return;
+  pinLookupTimer = setTimeout(async () => {
+    try {
+      const r = await fetch(`${API}/location/pincode/${encodeURIComponent(pin)}`);
+      const d = await r.json();
+      if(!r.ok) throw new Error(d.error || 'PIN code not found. Please enter the correct PIN code.');
+      if(requestId !== pinLookupRequest) return;
+      document.getElementById('reg-pin').style.color = '#22c55e';
+      document.getElementById('reg-pin-status').textContent = '';
+    } catch(e) {
+      if(requestId !== pinLookupRequest) return;
+      document.getElementById('reg-pin').style.color = '';
+      document.getElementById('reg-pin-status').textContent = e.message && e.message.includes('not found')
+        ? 'PIN code not found. Please enter the correct PIN code.'
+        : 'Could not check the PIN code right now. Please try again.';
+    }
+  }, 350);
+}
+
 async function verifyOTP() {
   const otp = [0,1,2,3,4,5].map(i=>document.getElementById('otp'+i).value).join('');
   if(otp.length !== 6){ toast('Enter all 6 digits','error'); return; }
@@ -1087,15 +1172,14 @@ async function submitProfile() {
   const pin = document.getElementById('reg-pin').value.trim();
   if(!name){ toast('Enter your name','error'); return; }
   if(!location){ toast('Enter your city/location','error'); return; }
-  if(!pinAddress){ toast('Enter your address','error'); return; }
+  if(!/^[1-9]\d{5}$/.test(pin)){ toast('Enter a valid 6-digit PIN code','error'); return; }
 
   try {
     // Use the already-verified token to update profile — no need to re-verify OTP
-    const fullAddress = pinAddress + (pin ? ' – PIN: '+pin : '');
     const r = await fetch(`${API}/user/profile`,{
       method:'PUT',
       headers:{'Content-Type':'application/json','Authorization':'Bearer '+verifiedSession.token},
-      body:JSON.stringify({name, location, pinAddress: fullAddress})
+      body:JSON.stringify({name, location, pinCode: pin, pinAddress})
     });
     const d = await r.json();
     if(d.error) throw new Error(d.error);
@@ -1110,8 +1194,7 @@ async function submitProfile() {
 function setSession(token, user) {
   state.token = token;
   state.user = user;
-  localStorage.setItem('token', token);
-  localStorage.setItem('user', JSON.stringify(user));
+  sessionStorage.setItem('token', token);
   updateTopbar();
 }
 
@@ -1148,6 +1231,7 @@ function updateTopbar() {
 
 function logout() {
   state.token = null; state.user = null;
+  sessionStorage.removeItem('token');
   localStorage.removeItem('token'); localStorage.removeItem('user');
   updateTopbar();
   showPage('home');
@@ -1174,22 +1258,22 @@ async function loadBookings() {
       <div class="booking-card">
         <div class="bc-header">
           <div>
-            <h4>${applianceIcon(b.appliance)} ${b.appliance}</h4>
-            <div class="bc-meta">${b.serviceType}</div>
+            <h4>${applianceIcon(b.appliance)} ${escapeHtml(b.appliance)}</h4>
+            <div class="bc-meta">${escapeHtml(b.serviceType)}</div>
           </div>
-          <div class="badge badge-${b.status}">${b.status}</div>
+          <div class="badge badge-${escapeHtml(b.status)}">${escapeHtml(b.status)}</div>
         </div>
         <div class="bc-row">
-          <div class="bc-tag">📅 ${b.preferredDate}</div>
-          <div class="bc-tag">🕐 ${b.preferredTime}</div>
+          <div class="bc-tag">📅 ${escapeHtml(b.preferredDate)}</div>
+          <div class="bc-tag">🕐 ${escapeHtml(b.preferredTime)}</div>
         </div>
         <div class="bc-row">
-          <div class="bc-tag">📍 ${b.userLocation}</div>
+          <div class="bc-tag">📍 ${escapeHtml(b.userLocation)}</div>
         </div>
         <p style="font-size:11px;color:var(--muted);margin-top:6px;">Booked on ${fmtDate(b.createdAt)}</p>
       </div>
     `).join('');
-  } catch(e){ el.innerHTML=`<p class="text-muted text-center" style="padding:32px;">${e.message}</p>`; }
+  } catch(e){ el.innerHTML=`<p class="text-muted text-center" style="padding:32px;">${escapeHtml(e.message)}</p>`; }
 }
 
 // ═══════════════════════════════════════════════════════════════════
@@ -1209,34 +1293,34 @@ async function loadProfile() {
     const pending = bs.filter(b=>b.status==='pending').length;
     el.innerHTML = `
       <div class="profile-hero">
-        <div class="profile-avatar">${u.name[0].toUpperCase()}</div>
-        <h2>${u.name}</h2>
-        <p>+91 ${u.phone}</p>
+        <div class="profile-avatar">${escapeHtml((u.name || 'U')[0].toUpperCase())}</div>
+        <h2>${escapeHtml(u.name)}</h2>
+        <p>+91 ${escapeHtml(u.phone)}</p>
       </div>
       <div class="profile-stats">
         <div class="stat-box"><div class="num">${bs.length}</div><div class="lbl">Total</div></div>
         <div class="stat-box"><div class="num">${confirmed}</div><div class="lbl">Confirmed</div></div>
         <div class="stat-box"><div class="num">${pending}</div><div class="lbl">Pending</div></div>
       </div>
-      <div class="info-row"><div class="ir-icon">👤</div><div class="ir-text"><div class="ir-label">Full Name</div><div class="ir-val">${u.name}</div></div></div>
-      <div class="info-row"><div class="ir-icon">📱</div><div class="ir-text"><div class="ir-label">Phone</div><div class="ir-val">+91 ${u.phone}</div></div></div>
-      <div class="info-row"><div class="ir-icon">📍</div><div class="ir-text"><div class="ir-label">City / Location</div><div class="ir-val">${u.location||'Not set'}</div></div></div>
-      <div class="info-row"><div class="ir-icon">🏠</div><div class="ir-text"><div class="ir-label">Address</div><div class="ir-val">${u.pinAddress||'Not set'}</div></div></div>
+      <div class="info-row"><div class="ir-icon">👤</div><div class="ir-text"><div class="ir-label">Full Name</div><div class="ir-val">${escapeHtml(u.name)}</div></div></div>
+      <div class="info-row"><div class="ir-icon">📱</div><div class="ir-text"><div class="ir-label">Phone</div><div class="ir-val">+91 ${escapeHtml(u.phone)}</div></div></div>
+      <div class="info-row"><div class="ir-icon">📍</div><div class="ir-text"><div class="ir-label">City / Location</div><div class="ir-val">${escapeHtml(u.location||'Not set')}</div></div></div>
+      <div class="info-row"><div class="ir-icon">🏠</div><div class="ir-text"><div class="ir-label">Address</div><div class="ir-val">${escapeHtml(u.pinAddress||'Not set')}</div></div></div>
       <div class="info-row"><div class="ir-icon">📅</div><div class="ir-text"><div class="ir-label">Member Since</div><div class="ir-val">${fmtDate(u.createdAt)}</div></div></div>
       <div style="padding:20px 20px 0;">
         <div class="section-label" style="padding:0 0 12px;">Booking History</div>
         ${bs.length ? bs.map(b=>`
           <div class="booking-card" style="margin-bottom:10px;">
             <div class="bc-header">
-              <div><h4>${applianceIcon(b.appliance)} ${b.appliance} – ${b.serviceType}</h4><div class="bc-meta">${b.preferredDate} | ${b.preferredTime}</div></div>
-              <div class="badge badge-${b.status}">${b.status}</div>
+              <div><h4>${applianceIcon(b.appliance)} ${escapeHtml(b.appliance)} – ${escapeHtml(b.serviceType)}</h4><div class="bc-meta">${escapeHtml(b.preferredDate)} | ${escapeHtml(b.preferredTime)}</div></div>
+              <div class="badge badge-${escapeHtml(b.status)}">${escapeHtml(b.status)}</div>
             </div>
           </div>
         `).join('') : '<p class="text-muted">No bookings yet</p>'}
       </div>
       <button class="logout-btn" onclick="logout()">🚪 Logout</button>
     `;
-  } catch(e){ el.innerHTML=`<p class="text-muted text-center" style="padding:32px;">${e.message}</p>`; }
+  } catch(e){ el.innerHTML=`<p class="text-muted text-center" style="padding:32px;">${escapeHtml(e.message)}</p>`; }
 }
 
 // ═══════════════════════════════════════════════════════════════════
@@ -1292,9 +1376,9 @@ async function loadAdminData(tab) {
         <div class="admin-booking-card">
           <div class="ab-top">
             <div>
-              <h4>👤 ${u.name}</h4>
-              <div class="ab-info">📱 +91 ${u.phone}</div>
-              <div class="ab-info">📍 ${u.location||'—'} | ${u.pinAddress||'—'}</div>
+              <h4>👤 ${escapeHtml(u.name)}</h4>
+              <div class="ab-info">📱 +91 ${escapeHtml(u.phone)}</div>
+              <div class="ab-info">📍 ${escapeHtml(u.location||'—')} | ${escapeHtml(u.pinAddress||'—')}</div>
               <div class="ab-info" style="font-size:11px;color:var(--muted);">Joined ${fmtDate(u.createdAt)}</div>
             </div>
           </div>
@@ -1306,16 +1390,16 @@ async function loadAdminData(tab) {
       const bookings = d.bookings;
       if(!bookings.length){ el.innerHTML=`<div class="empty-state"><div class="ei">📋</div><h3>No bookings</h3></div>`; return; }
       el.innerHTML = bookings.map(b=>`
-         <div class="admin-booking-card" id="ab-${b._id}">
+         <div class="admin-booking-card" id="ab-${escapeHtml(b._id)}">
           <div class="ab-top">
             <div>
-              <h4>${applianceIcon(b.appliance)} ${b.appliance} – ${b.serviceType}</h4>
-              <div class="ab-info">👤 ${b.userName} | 📱 +91 ${b.userPhone}</div>
-              <div class="ab-info">📍 ${b.userLocation} | ${b.userPinAddress}</div>
-              <div class="ab-info">📅 ${b.preferredDate} | 🕐 ${b.preferredTime}</div>
-              ${b.description?`<div class="ab-info">📝 ${b.description}</div>`:''}
+              <h4>${applianceIcon(b.appliance)} ${escapeHtml(b.appliance)} – ${escapeHtml(b.serviceType)}</h4>
+              <div class="ab-info">👤 ${escapeHtml(b.userName)} | 📱 +91 ${escapeHtml(b.userPhone)}</div>
+              <div class="ab-info">📍 ${escapeHtml(b.userLocation)} | ${escapeHtml(b.userPinAddress)}</div>
+              <div class="ab-info">📅 ${escapeHtml(b.preferredDate)} | 🕐 ${escapeHtml(b.preferredTime)}</div>
+              ${b.description?`<div class="ab-info">📝 ${escapeHtml(b.description)}</div>`:''}
             </div>
-            <div class="badge badge-${b.status}">${b.status}</div>
+            <div class="badge badge-${escapeHtml(b.status)}">${escapeHtml(b.status)}</div>
           </div>
           ${b.status==='pending'?`
             <div class="action-row">
@@ -1327,12 +1411,12 @@ async function loadAdminData(tab) {
               <button class="btn btn-sm" style="background:#0a1a2e;color:var(--info);border:1px solid var(--info);" onclick="updateBooking('${b._id}','completed')">✓ Mark Complete</button>
             </div>
           `:''}
-          <p style="font-size:10px;color:var(--muted);margin-top:8px;">ID: ${b._id.toString().slice(0,8)}... | ${fmtDate(b.createdAt)}</p>
+          <p style="font-size:10px;color:var(--muted);margin-top:8px;">ID: ${escapeHtml(b._id.toString().slice(0,8))}... | ${fmtDate(b.createdAt)}</p>
 
         </div>
       `).join('');
     }
-  } catch(e){ el.innerHTML=`<p class="text-muted text-center" style="padding:32px;">${e.message}</p>`; }
+  } catch(e){ el.innerHTML=`<p class="text-muted text-center" style="padding:32px;">${escapeHtml(e.message)}</p>`; }
 }
 
 async function updateBooking(id, status) {
@@ -1402,6 +1486,13 @@ function fmtDate(s) {
   return new Date(s).toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric'});
 }
 
+// Escape all server-provided strings before inserting them into legacy HTML templates.
+function escapeHtml(value) {
+  return String(value ?? '').replace(/[&<>"']/g, char => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+  })[char]);
+}
+
 function applianceIcon(name) {
   const a = appliances.find(x=>x.name===name);
   return a ? a.icon : '🔧';
@@ -1420,6 +1511,7 @@ function toast(msg, type='') {
 async function validateSession() {
   if (!state.token) {
     state.user = null;
+    localStorage.removeItem('token');
     localStorage.removeItem('user');
     updateTopbar();
     return;
@@ -1432,7 +1524,7 @@ async function validateSession() {
       // Token is invalid/expired — clear stale session
       state.token = null;
       state.user = null;
-      localStorage.removeItem('token');
+      sessionStorage.removeItem('token');
       localStorage.removeItem('user');
       updateTopbar();
       return;
@@ -1441,7 +1533,6 @@ async function validateSession() {
     const data = await r.json();
     state.user = data.user || null;
     if (state.user) {
-      localStorage.setItem('user', JSON.stringify(state.user));
     }
     updateTopbar();
   } catch(e) {
