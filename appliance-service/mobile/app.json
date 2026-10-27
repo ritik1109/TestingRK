@@ -5,6 +5,7 @@
     "scheme": "rrappliance",
     "version": "1.0.0",
     "orientation": "portrait",
+    "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
     "plugins": [
       "expo-router",
@@ -16,6 +17,10 @@
     },
     "android": {
       "package": "com.rrconsultancy.applianceservice",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#0D0D0D"
+      },
       "softwareKeyboardLayoutMode": "resize"
     },
     "web": {
