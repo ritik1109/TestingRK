@@ -96,7 +96,7 @@ export async function apiRequest<T>(
   const token = options.token ?? await readToken();
   const send = async (accessToken: string | null) => {
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 15000);
+    const timeout = setTimeout(() => controller.abort(), 60_000);
     try {
       return await fetch(`${API_URL}${path}`, {
         method: options.method ?? 'GET',

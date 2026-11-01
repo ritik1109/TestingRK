@@ -378,7 +378,8 @@ app.post(
       if (includeDevelopmentOtp) {
         return res.json({ success: true, message: 'Development OTP generated.', otp });
       }
-      await Otp.deleteOne({ phone: normalizedPhone });
+      // The provider may have delivered the SMS even when its response failed or timed out.
+      // Keep the pending code so a delivered OTP can still be verified.
       console.error(`[OTP] SMS delivery failed: ${smsErr.message}`);
       return res.status(503).json({ error: 'Unable to deliver a verification code. Please try again later.' });
     }
