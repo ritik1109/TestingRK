@@ -4,6 +4,7 @@ if (process.env.NODE_ENV !== 'production') {
 }
 
 const express = require('express');
+const path = require('path');
 const cors = require('cors');
 const bodyParser = require('body-parser');
 const jwt = require('jsonwebtoken');
@@ -67,14 +68,27 @@ const allowedOrigins = (process.env.CORS_ORIGINS || [
   'http://127.0.0.1:5500',
 ].join(',')).split(',').map((origin) => origin.trim()).filter(Boolean);
 app.disable('x-powered-by');
-app.use(cors({
+const corsMiddleware = cors({
   origin(origin, callback) {
     if (!origin || allowedOrigins.includes(origin)) return callback(null, true);
     return callback(new Error('Origin is not allowed by CORS'));
   },
   methods: ['GET', 'POST', 'PUT', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
-}));
+});
+app.use((req, res, next) => {
+  const origin = req.get('Origin');
+  if (origin) {
+    try {
+      const parsedOrigin = new URL(origin);
+      if (['http:', 'https:'].includes(parsedOrigin.protocol)
+        && parsedOrigin.host === req.get('host')) return next();
+    } catch {
+      // Let the CORS middleware reject malformed origins.
+    }
+  }
+  return corsMiddleware(req, res, next);
+});
 app.use((req, res, next) => {
   res.setHeader('X-Content-Type-Options', 'nosniff');
   res.setHeader('X-Frame-Options', 'DENY');
@@ -738,7 +752,15 @@ app.get('/api/health', (req, res) => {
   });
 });
 
-// ─── ROOT ROUTE ───────────────────────────────────────────────────────────  ← ADD THIS
+// Serve the existing admin frontend from the same origin as the API.
+const adminFrontendPath = path.join(__dirname, '..', 'frontend', 'index.html');
+app.get(['/admin', '/admin/'], (req, res, next) => {
+  res.sendFile(adminFrontendPath, (error) => {
+    if (error) next(error);
+  });
+});
+
+// ─── ROOT ROUTE ───────────────────────────────────────────────────────────
 app.get('/', (req, res) => res.json({ message: '🔧 Appliance Service API is running' }));
 
 

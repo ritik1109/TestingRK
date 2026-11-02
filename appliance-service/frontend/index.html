@@ -719,9 +719,9 @@
 // ═══════════════════════════════════════════════════════════════════
 //  CONFIG
 // ═══════════════════════════════════════════════════════════════════
-////const API = 'http://localhost:3001/api';
-
-const API = 'https://rk-consultancy.onrender.com/api';
+const API = window.location.pathname.startsWith('/admin')
+  ? `${window.location.origin}/api`
+  : 'https://rk-consultancy.onrender.com/api';
 
 
 // ─── CHECK BACKEND CONNECTION ───────────────────────────────────────
@@ -737,7 +737,7 @@ async function checkBackend() {
         font-family:'DM Sans',sans-serif;
       ">
         ⚠️ Backend not running! Open terminal → go to <b style="color:#fff;">backend/</b> folder → run <b style="color:#fff;">node server.js</b>
-        <button onclick="document.getElementById('backend-warning').remove();checkBackend();" 
+        <button onclick="document.getElementById('backend-warning').remove();checkBackend();"
           style="margin-left:12px;background:#EF4444;border:none;color:#fff;padding:4px 10px;border-radius:6px;cursor:pointer;font-size:12px;">
           Retry
         </button>
@@ -1546,6 +1546,7 @@ async function validateSession() {
 //  START
 // ═══════════════════════════════════════════════════════════════════
 init();
+if (window.location.pathname.startsWith('/admin')) showPage('admin-login');
 validateSession();
 checkBackend();
 

@@ -4,6 +4,12 @@ The customer-facing app is being developed with Expo for Android, iOS, and web.
 The existing static site remains under `frontend` for web administration, and
 the Express/MongoDB API is in `backend`.
 
+The backend serves the admin UI at `/admin` from the same origin as the API.
+When the backend is exposed through Cloudflare Tunnel, open
+`https://api.rrconsulting.me/admin` to sign in. Admin API calls remain protected by
+the configured `ADMIN_USERNAME` and `ADMIN_PASSWORD_HASH`; rotate any previously
+exposed admin password before making the page available publicly.
+
 ## Development setup
 
 - Install Node.js 20 LTS or newer.
