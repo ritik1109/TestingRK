@@ -1,0 +1,25 @@
+{
+  "expo": {
+    "name": "RR Service Admin",
+    "slug": "rr-appliance-service",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "automatic",
+    "plugins": [
+      "expo-router",
+      "expo-secure-store"
+    ],
+    "android": {
+      "package": "com.rrconsultancy.applianceservice.admin",
+      "softwareKeyboardLayoutMode": "resize"
+    },
+    "experiments": {
+      "typedRoutes": true
+    },
+    "extra": {
+      "eas": {
+        "projectId": "f6ee74db-8d17-4688-9efc-214d600272c5"
+      }
+    }
+  }
+}
