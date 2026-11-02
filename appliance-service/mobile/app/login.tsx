@@ -19,6 +19,7 @@ export default function LoginScreen() {
     content: { flexGrow: 1, gap: 16, justifyContent: 'center', padding: 20 },
     modeSwitch: { alignItems: 'center', padding: 12 },
     modeSwitchText: { color: colors.accent, fontSize: 14, fontWeight: '700' },
+    developmentOtp: { backgroundColor: colors.selected, borderColor: colors.warning, borderRadius: 12, borderWidth: 1, color: colors.text, fontSize: 15, fontWeight: '700', lineHeight: 22, padding: 12 },
   }), [colors]);
   const { signIn } = useApp();
   const [mode, setMode] = useState<AuthMode>('signup');
@@ -33,11 +34,13 @@ export default function LoginScreen() {
   const [pinAddress, setPinAddress] = useState('');
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
+  const [developmentOtp, setDevelopmentOtp] = useState('');
 
   /** Let the customer switch between registration and returning-customer login. */
   function switchMode(nextMode: AuthMode) {
     setMode(nextMode);
     setMessage('');
+    setDevelopmentOtp('');
     if (step !== 'otp') setStep('phone');
   }
 
@@ -54,10 +57,18 @@ export default function LoginScreen() {
     }
     setBusy(true);
     setMessage('');
+    setDevelopmentOtp('');
     try {
-      await apiRequest('/auth/send-otp', { method: 'POST', body: { phone: digits, intent: mode } });
+      const response = await apiRequest<{
+        developmentOtp?: boolean;
+        otp?: string;
+      }>('/auth/send-otp', { method: 'POST', body: { phone: digits, intent: mode } });
       setPhone(digits);
       setStep('otp');
+      if (response.developmentOtp === true && typeof response.otp === 'string' && /^\d{6}$/.test(response.otp)) {
+        setOtp(response.otp);
+        setDevelopmentOtp(response.otp);
+      }
     } catch (error) {
       setMessage(error instanceof Error ? error.message : 'Could not send the OTP.');
     } finally {
@@ -201,7 +212,14 @@ export default function LoginScreen() {
       ) : null}
       {step === 'otp' ? (
         <>
-          <Text style={commonStyles.muted}>Enter the six-digit code sent to +91 {phone}.</Text>
+          <Text style={commonStyles.muted}>
+            {developmentOtp ? `Enter the local test code for +91 ${phone}.` : `Enter the six-digit code sent to +91 ${phone}.`}
+          </Text>
+          {developmentOtp ? (
+            <Text accessibilityRole="alert" style={styles.developmentOtp}>
+              Local development code: {developmentOtp}. This code is not sent by SMS. Use only with a local test backend.
+            </Text>
+          ) : null}
           <Field
             accessibilityLabel="Six-digit OTP"
             autoComplete="one-time-code"

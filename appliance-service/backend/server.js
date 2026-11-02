@@ -21,11 +21,14 @@ const {
   validText,
 } = require('./lib/validation');
 const { getPostalAreas } = require('./lib/postal');
+const { isDevelopmentOtpMode } = require('./lib/otp-mode');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
 const JWT_SECRET = process.env.JWT_SECRET;
 const FAST2SMS_API_KEY = process.env.FAST2SMS_API_KEY;
+const otpDeliveryMode = process.env.OTP_DELIVERY_MODE || 'fast2sms';
+const otpTestPhone = normalizePhone(process.env.OTP_TEST_PHONE || '');
 const ADMIN_PHONE_NUMBER = process.env.ADMIN_PHONE_NUMBER || '';
 const MONGO_URI = process.env.MONGO_URI;
 const ADMIN_USERNAME = process.env.ADMIN_USERNAME;
@@ -53,12 +56,25 @@ try {
   missingConfig.push('BUSINESS_TIME_ZONE (valid IANA time zone)');
 }
 if (isProduction && !process.env.CORS_ORIGINS) missingConfig.push('CORS_ORIGINS');
+if (!['fast2sms', 'development'].includes(otpDeliveryMode)) {
+  missingConfig.push('OTP_DELIVERY_MODE (fast2sms or development)');
+}
+if (process.env.NODE_ENV === 'development' && otpDeliveryMode === 'development' && otpTestPhone.length !== 10) {
+  missingConfig.push('OTP_TEST_PHONE (10-digit number required in development OTP mode)');
+}
 if (missingConfig.length) {
   console.error(`❌ Missing or invalid required configuration: ${missingConfig.join(', ')}`);
   process.exit(1);
 }
 if (!FAST2SMS_API_KEY) {
-  console.warn('⚠️  FAST2SMS_API_KEY is missing. SMS will not be sent.');
+  if (process.env.NODE_ENV === 'development' && otpDeliveryMode === 'development') {
+    console.warn('⚠️  Development OTP mode is enabled for its configured test phone only.');
+  } else {
+    console.warn('⚠️  FAST2SMS_API_KEY is missing. SMS will not be sent.');
+  }
+}
+if (isProduction && otpDeliveryMode === 'development') {
+  console.warn('⚠️  Development OTP mode is disabled in production; Fast2SMS remains required.');
 }
 
 const allowedOrigins = (process.env.CORS_ORIGINS || [
@@ -382,16 +398,29 @@ app.post(
       { upsert: true, new: true }
     );
 
+    if (otpDeliveryMode === 'development' && process.env.NODE_ENV === 'development') {
+      if (!isDevelopmentOtpMode({
+        nodeEnv: process.env.NODE_ENV,
+        deliveryMode: otpDeliveryMode,
+        phone: normalizedPhone,
+        testPhone: otpTestPhone,
+      })) {
+        await Otp.deleteOne({ phone: normalizedPhone });
+        return res.status(403).json({ error: 'Development OTP mode is restricted to the configured test phone.' });
+      }
+      return res.json({
+        success: true,
+        message: 'Development OTP generated for the configured test phone.',
+        developmentOtp: true,
+        otp,
+      });
+    }
+
     try {
       await sendViaFast2SMS(normalizedPhone, otp);
       console.log('[OTP] SMS sent successfully.');
       return res.json({ success: true, message: 'OTP sent successfully' });
     } catch (smsErr) {
-      const includeDevelopmentOtp =
-        !isProduction && process.env.OTP_INCLUDE_IN_RESPONSE === 'true';
-      if (includeDevelopmentOtp) {
-        return res.json({ success: true, message: 'Development OTP generated.', otp });
-      }
       // The provider may have delivered the SMS even when its response failed or timed out.
       // Keep the pending code so a delivered OTP can still be verified.
       console.error(`[OTP] SMS delivery failed: ${smsErr.message}`);

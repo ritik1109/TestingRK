@@ -15,10 +15,14 @@ Required settings:
 - `BUSINESS_TIME_ZONE`: IANA time zone used to reject past appointment dates
   (defaults to `Asia/Kolkata`).
 
-Set `FAST2SMS_API_KEY` before enabling OTP login. On delivery failure the API
-returns an error and invalidates the unsent code. A development-only OTP
-response is available only when `NODE_ENV` is not `production` and
-`OTP_INCLUDE_IN_RESPONSE=true`.
+Set `FAST2SMS_API_KEY` before enabling OTP login. For isolated local testing
+only, set `OTP_DELIVERY_MODE=development` and `OTP_TEST_PHONE` to one test
+number; when `NODE_ENV=development`, the server returns the generated
+OTP in the API response for that number and does not send an SMS. Other numbers
+are rejected without attempting SMS delivery. The customer app marks and
+displays only an explicitly development-mode code. Keep this mode off on the
+Ubuntu server exposed through Cloudflare and on all production deployments;
+production always uses Fast2SMS and never returns the OTP.
 Mobile OTP requests include the selected sign-up/sign-in intent; the API checks
 account existence before sending an SMS and refuses mismatched choices. This
 reveals account existence to the requester, so OTP requests are rate-limited by
